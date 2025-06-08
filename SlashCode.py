@@ -7,6 +7,7 @@ import builtins
 import os
 import json
 import sys
+from functools import lru_cache
 from tkinter import filedialog, scrolledtext
 
 root = tk.Tk()
@@ -104,6 +105,21 @@ LANGUAGE_FUNCS = {
     'html': {} # HTML doesn't have any functions (you'd need to use JavaScript).
 }
 
+LANGUAGE_TYPES = {
+    "cpp": {
+        "int", "float", "double", "char", "void", "bool", "short", "long", "unsigned", "signed",
+        "size_t", "std::string", "std::vector", "std::map", "std::set", "std::array", "wchar_t",
+        "auto", "decltype", "std::shared_ptr", "std::unique_ptr", "std::weak_ptr"
+    },
+    "python": {
+        "int", "float", "str", "bool", "list", "tuple", "dict", "set", "object", "bytes"
+    },
+    "javascript": {
+        "Number", "String", "Boolean", "Array", "Object", "Function", "Symbol", "BigInt"
+    },
+    "html": set()
+}
+
 html_attrs = {
     'id', 'class', 'style', 'src', 'href', 'alt', 'title', 'type', 'value', 'name',
     'placeholder', 'for', 'action', 'method', 'target', 'rel', 'disabled', 'checked',
@@ -126,7 +142,8 @@ def open_file(event=None):
     ("C++ files", "*.cpp *.hpp"),
     ("Header files", "*.h"),
     ("Text files", "*.txt"),
-    ("All files", "*.py *.js *.html *.c *.cpp *.hpp *.h *.txt"),
+    ("C# files", "*.cs"),
+    ("All files", "*.py *.js *.html *.c *.cpp *.hpp *.h *.cs *.txt"),
     ]
     file = filedialog.askopenfilename(filetypes=filetypes)
     if file:
@@ -140,7 +157,7 @@ def open_file(event=None):
             if lang == 'plaintext':
                 lang = guess_language_from_content(code)
             language_var.set(lang)
-        highlight()
+        highlight_full_document()
 
 def save_file(event=None):
     try:
@@ -192,6 +209,8 @@ def get_language(file_path):
         return 'html'
     elif file_path.endswith('.cpp'):
         return 'cpp'
+    elif file_path.endswith('.cs'):
+        return 'cs'
     else:
         return 'plaintext'
     
@@ -215,261 +234,309 @@ def guess_language_from_content(content):
         return 'javascript'    
     return 'plaintext'
 
-def highlight(event=None):
-    # Set the preferred language.
+def highlight_line(event=None):
+    line = text.index("insert").split('.')[0]
+    region_start = f"{line}.0"
+    region_end = f"{line}.end"
+    content = text.get(region_start, region_end)
+    for tag in text.tag_names():
+        text.tag_remove(tag, region_start, region_end)
+    highlight(region_start=region_start, region_end=region_end, content=content)
+    
+def highlight_full_document():
+    highlight(full_document=True)
+
+def highlight(event=None, full_document=False, region_start=None, region_end=None, content=None):
+    """
+    If full_document is True, highlights the whole file.
+    If False (default), highlights only the current line.
+    """
     language = language_var.get()
     keywords = LANGUAGE_KEYWORDS.get(language, set())
     funcs = LANGUAGE_FUNCS.get(language, set())
-    
-    for tag in text.tag_names():
-        text.tag_remove(tag, "1.0", tk.END)
-    
-    content = text.get("1.0", tk.END)
+    types = LANGUAGE_TYPES.get(language, set())
+    html_attr_pattern = r'\b(' + '|'.join(html_attrs) + r')\s*='
+
+    if full_document:
+        # Remove all tags before re-highlighting
+        for tag in text.tag_names():
+            text.tag_remove(tag, "1.0", tk.END)
+        region_start = "1.0"
+        region_end = tk.END
+        content = text.get(region_start, region_end)
+    elif region_start is None or region_end is None or content is None:
+        line = text.index("insert").split('.')[0]
+        region_start = f"{line}.0"
+        region_end = f"{line}.end"
+        content = text.get(region_start, region_end)
+        
+    if language == "plaintext":
+        return
+
     comment_spans = []
     string_spans = []
-
-    def is_in_string_or_comment(index):
-        return any(s <= index < e for s, e in comment_spans + string_spans)
-
-    # Process comments.
+    preproc_spans = []
+    
+    def is_in_comment(idx):
+        return any(s <= idx < e for s, e in comment_spans)
+    
+    def is_in_string_or_comment(idx):
+        return any(s <= idx < e for s, e in comment_spans + string_spans)
+    
+    def is_in_preproc(idx):
+        return any(s <= idx < e for s, e in preproc_spans)
+    
+    # --- Builtins ---
     if language == "python":
-        for match in re.finditer(r'#.*|("""|\'\'\')[\s\S]*?\1', content, re.VERBOSE):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                comment_spans.append((start, end))
-                text.tag_add("comment", f"1.0+{start}c", f"1.0+{end}c")
+        builtins = LANGUAGE_FUNCS.get(language, set())
+        if builtins:
+            for match in re.finditer(r"\b(" + "|".join(map(re.escape, builtins)) + r")\b", content):
+                if not is_in_string_or_comment(match.start()):
+                    text.tag_add("builtin", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+
+    # --- Comments ---
+    if language == "python":
+        if full_document:
+            pattern = r'#.*|("""|\'\'\')[\s\S]*?\1'
+        else:
+            pattern = r'#.*'
+        for match in re.finditer(pattern, content, re.VERBOSE):
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
     elif language == "javascript":
-        for match in re.finditer(r'//.*|/\*.*?\*/', content, re.DOTALL):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                comment_spans.append((start, end))
-                text.tag_add("comment", f"1.0+{start}c", f"1.0+{end}c")
-
-
+        for match in re.finditer(r'//.*$', content, re.MULTILINE):
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            for match in re.finditer(r'/\*[\s\S]*?\*/', content):
+                s, e = match.start(), match.end()
+                comment_spans.append((s, e))
+                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
     elif language == "html":
         for match in re.finditer(r'<!--.*?-->', content, re.DOTALL):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                comment_spans.append((start, end))
-                text.tag_add("comment", f"1.0+{start}c", f"1.0+{end}c")
-                
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
     elif language == "cpp":
         for match in re.finditer(r'//.*', content):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                comment_spans.append((start, end))
-                text.tag_add("comment", f"1.0+{start}c", f"1.0+{end}c")
-        
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
         for match in re.finditer(r'/\*.*?\*/', content, re.DOTALL):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                comment_spans.append((start, end))
-                text.tag_add("comment", f"1.0+{start}c", f"1.0+{end}c")
-                
-    # Process strings after comments.
-    string_pattern = r'''
-    (")(?:\\.|(?!\1).)*?\1 |  # Double-quoted strings (handles escaped quotes)
-    (')(?:\\.|(?!\1).)*?\2    # Single-quoted strings
-    '''
-    for match in re.finditer(string_pattern, content, re.VERBOSE):
-        start, end = match.start(), match.end()
-        if not is_in_string_or_comment(start):
-            string_spans.append((start, end))
-            text.tag_add("string", f"1.0+{start}c", f"1.0+{end}c")
-            string_content = content[start:end]
-            for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', string_content):
-                esc_start = start + esc_match.start()
-                esc_end = start + esc_match.end()
-                text.tag_add("escape", f"1.0+{esc_start}c", f"1.0+{esc_end}c")
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        
+    # --- Strings ---    
+    if language == "cpp":
+        for match in re.finditer(r'"(?:[^"\\]|\\.)*"', content):
+            s, e = match.start(), match.end()
+            if not is_in_comment(s) and not is_in_preproc(s):
+                string_spans.append((s, e))
+                text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                string_content = content[s:e]
+                for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', string_content):
+                    esc_s = s + esc_match.start()
+                    esc_e = s + esc_match.end()
+                    text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
+    
+        for match in re.finditer(r"'(?:[^'\\]|\\.)'", content):
+            s, e = match.start(), match.end()
+            if not is_in_comment(s) and not is_in_preproc(s):
+                text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                char_content = content[s:e]
+                for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', char_content):
+                    esc_s = s + esc_match.start()
+                    esc_e = s + esc_match.end()
+                    text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
+    
+    # --- Operators ---       
+    if language in ("cpp", "python", "javascript"):
+        operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|,|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
+        for match in re.finditer(operator_pattern, content):
+            s, e = match.start(), match.end()
+            if not any(is_in_string_or_comment(i) for i in range(s, e)):
+                text.tag_add("operator", f"{region_start}+{s}c", f"{region_start}+{e}c")
             
+    # --- Semicolons (C++, JavaScript) ---
+    for match in re.finditer(r';', content):
+        s, e = match.start(), match.end()
+        if not is_in_string_or_comment(s):
+            text.tag_add("semicolon", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+    # --- Preprocessor (C++) ---
+    
     if language == "cpp":
-        # Sometimes, the preprocessors can get mistaken by a comment by the highlighting, which we do not want.
-        for match in re.finditer(r'^[ \t]*#(define|undef|include|if|ifdef|ifndef|else|elif|endif|error|pragma|line|using|import|module)\b[^\n]*', content, re.MULTILINE):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                line = content[start:end]
+        pattern = r'^[ \t]*#(define|undef|include|if|ifdef|ifndef|else|elif|endif|error|pragma|line|using|import|module)\b([^\n]*)'
+        for match in re.finditer(pattern, content, re.MULTILINE):
+            s, e = match.start(), match.end()
+            if not is_in_string_or_comment(s):
+                directive = match.group(1)
+                line = content[s:e]
                 hash_pos = line.find('#')
-                directive_end = start + hash_pos + len(match.group(1)) if match.group(1) else end
-                
-                text.tag_add("preprocessor", f"1.0+{start}c", f"1.0+{directive_end}c")
-                
+                directive_start = s + hash_pos
+                directive_end = directive_start + 1 + len(directive)
+                text.tag_add("preprocessor", f"{region_start}+{directive_start}c", f"{region_start}+{directive_end}c")
                 rest_start = directive_end
-                rest_end = end
+                rest_end = e
                 if rest_start < rest_end:
-                    rest_content = content[rest_start:rest_end]
-                    comment_pos = rest_content.find('//')
-                    if comment_pos != -1:
-                        args_end = rest_start + comment_pos
-                        comment_start = args_end
-                        comment_end = rest_end
-                        text.tag_add("preprocessor_rest", f"1.0+{rest_start}c", f"1.0+{args_end}c")
-                        text.tag_add("comment", f"1.0+{comment_start}c", f"1.0+{comment_end}c")
-                    else:
-                        text.tag_add("preprocessor_rest", f"1.0+{rest_start}c", f"1.0+{rest_end}c")
+                    text.tag_add("preprocessor_rest", f"{region_start}+{rest_start}c", f"{region_start}+{rest_end}c")
+                # Record the whole preprocessor line as a span
+                preproc_spans.append((s, e))
 
-    # Templates (like std::vector<std::string, int>).
+    # --- Templates (C++) ---
     if language == "cpp":
-        stack = []
-        i = 0
-        while i < len(content):
-            if content[i] == '<' and not is_in_string_or_comment(i):
-                stack.append(i)
-            elif content[i] == '>' and stack and not is_in_string_or_comment(i):
-                start = stack.pop()
-                if not stack:  # Only highlight top-level templates
-                    text.tag_add("template", f"1.0+{start}c", f"1.0+{i+1}c")
-            i += 1
+        # Match identifiers followed by '<' (but not operators like << or <=)
+        id_pattern = re.compile(r'\b([A-Za-z_][A-Za-z0-9_:]*)\s*<(?![<=])')
+        for id_match in id_pattern.finditer(content):
+            identifier = id_match.group(1)
+            if identifier in keywords or identifier in funcs:
+                continue  # Skip keywords/functions
+            open_angle = id_match.end() - 1
+            if is_in_string_or_comment(open_angle):
+                continue
+            # Limit search to 200 characters to avoid runaway highlighting
+            max_search = min(len(content), open_angle + 200)
+            depth = 0
+            for i in range(open_angle, max_search):
+                if content[i] == '<' and not is_in_string_or_comment(i):
+                    depth += 1
+                elif content[i] == '>' and not is_in_string_or_comment(i):
+                    depth -= 1
+                    if depth == 0:
+                        text.tag_add("template", f"{region_start}+{open_angle}c", f"{region_start}+{i+1}c")
+                        break
 
-    # Operators (like *, +=, etc.).
-    if language in ("cpp", "python", "js"):
-        operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|\/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
-        for match in re.finditer(operator_pattern, content, re.VERBOSE):
-            start, end = match.start(), match.end()
-            if not is_in_string_or_comment(start):
-                text.tag_add("operator", f"1.0+{start}c", f"1.0+{end}c")
-
-    # Pointers/References (like * and &).
+    # --- Pointers/References (C++) ---
     if language == "cpp":
         for match in re.finditer(r'\b([A-Za-z_][A-Za-z0-9_:]*)\s*(\*+|&)(?=\s*\w)', content):
             ptr_start, ptr_end = match.start(2), match.end(2)
             if not is_in_string_or_comment(ptr_start):
-                text.tag_add("pointer", f"1.0+{ptr_start}c", f"1.0+{ptr_end}c")
+                text.tag_add("pointer", f"{region_start}+{ptr_start}c", f"{region_start}+{ptr_end}c")
                 
-    # Check for dunder methods (like __init__).
+    # --- Members ---
+    for match in re.finditer(r'\.(\w+)\b(?!\s*\()', content):
+        member_start = match.start(1)
+        member_end = match.end(1)
+        if not is_in_string_or_comment(member_start):
+            text.tag_add("member", f"{region_start}+{member_start}c", f"{region_start}+{member_end}c")
+
+
+    # --- Dunder Methods ---
     for match in re.finditer(r'\b(__\w+__)\b', content):
-        start, end = match.start(), match.end()
-        text.tag_add("dunder", f"1.0+{start}c", f"1.0+{end}c")
-        
-    # Process integers.
+        s, e = match.start(), match.end()
+        text.tag_add("dunder", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+    # --- Integers ---
     for match in re.finditer(r'\b\d+\b', content):
-        start, end = match.start(), match.end()
-        if not is_in_string_or_comment(start):
-            text.tag_add("integer", f"1.0+{start}c", f"1.0+{end}c")
-    
-    # Process f-strings with expression handling.
-    for f_match in re.finditer(r'(?P<prefix>[fFrR]{1,2})(?P<quote>["\'])(?P<body>.*?)(?P=quote)', content, re.DOTALL):
-        if is_in_string_or_comment(f_match.start()):
-            continue
-        
-        prefix_start = f_match.start('prefix')
-        quote_end = f_match.end('quote')
-        body_start = f_match.start('body')
-        body_end = f_match.end('body')
-        
-        
-                    
-        string_spans.append((prefix_start, quote_end))
-        text.tag_add("string", f"1.0+{prefix_start}c", f"1.0+{quote_end}c")
-        text.tag_add("prefix", f"1.0+{prefix_start}c", f"1.0+{f_match.end('prefix')}c")
-        
-        # Split f-string body into literals and expressions.
-        body = f_match.group('body')
-        current_pos = body_start
-        for part in re.finditer(r'(.*?)(\{.*?\}|$)', body):
-            literal = part.group(1)
-            expr = part.group(2)
-            
-            if literal:
-                lit_start = current_pos
-                lit_end = lit_start + len(literal)
-                string_spans.append((lit_start, lit_end))
-                text.tag_add("string", f"1.0+{lit_start}c", f"1.0+{lit_end}c")
-                current_pos = lit_end
-            
-            if expr and expr.startswith('{'):
-                # Process expression content.
-                expr_start = current_pos
-                expr_end = current_pos + len(expr)
-                current_pos = expr_end
-                
-                # Remove the string tag from the expression.
-                text.tag_remove("string", f"1.0+{expr_start}c", f"1.0+{expr_end}c")
-                
-                # Process the inner expression.
-                inner_text = expr[1:-1]  # Remove the braces.
-                inner_start = expr_start + 1
-                
-                for func_match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', inner_text):
-                    f_start = inner_start + func_match.start(1)
-                    f_end = inner_start + func_match.end(1)
-                    text.tag_add("funccall", f"1.0+{f_start}c", f"1.0+{f_end}c")
-                    
-                text.tag_add("punctuation", f"1.0+{expr_start}c", f"1.0+{expr_start+1}c")
-                text.tag_add("punctuation", f"1.0+{expr_end-1}c", f"1.0+{expr_end}c")
-                
-                # Tag code elements within the expression.
-                for var_match in re.finditer(r'\b([a-zA-Z_]\w*)\b', inner_text):
-                    v_start = inner_start + var_match.start(1)
-                    v_end = inner_start + var_match.end(1)
-                    if not any(text.tag_names(f"1.0+{v_start}c")):
-                        text.tag_add("variable", f"1.0+{v_start}c", f"1.0+{v_end}c")
-                
-                for num_match in re.finditer(r'\b\d+\b', inner_text):
-                    n_start = inner_start + num_match.start()
-                    n_end = inner_start + num_match.end()
-                    text.tag_add("number", f"1.0+{n_start}c", f"1.0+{n_end}c")
-                
-                for dunder_match in re.finditer(r'\b(__\w+__)\b', inner_text):
-                    d_start = inner_start + dunder_match.start()
-                    d_end = inner_start + dunder_match.end()
-                    text.tag_add("dunder", f"1.0+{d_start}c", f"1.0+{d_end}c")
-    
-    # Tag keywords and functions outside strings.
-    for match in re.finditer(r"\b(" + "|".join(keywords) + r")\b", content):
-        if not is_in_string_or_comment(match.start()):
-            text.tag_add("keyword", f"1.0+{match.start()}c", f"1.0+{match.end()}c")
-    
-    for match in re.finditer(r"\b(" + "|".join(funcs) + r")\b", content):
-        if not is_in_string_or_comment(match.start()):
-            text.tag_add("function", f"1.0+{match.start()}c", f"1.0+{match.end()}c")
-    
-    # Tag function calls.
+        s, e = match.start(), match.end()
+        if not is_in_string_or_comment(s):
+            text.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+    # --- f-strings (Python, C# for $"{}") ---
+    if language == "python" or language == "cs":
+        for f_match in re.finditer(r'(?P<prefix>[fFrR|\$]{1,2})(?P<quote>["\'])(?P<body>.*?)(?P=quote)', content, re.DOTALL):
+            if is_in_string_or_comment(f_match.start()):
+                continue
+            prefix_start = f_match.start('prefix')
+            quote_end = f_match.end('quote')
+            body_start = f_match.start('body')
+            body_end = f_match.end('body')
+            string_spans.append((prefix_start, quote_end))
+            text.tag_add("string", f"{region_start}+{prefix_start}c", f"{region_start}+{quote_end}c")
+            text.tag_add("prefix", f"{region_start}+{prefix_start}c", f"{region_start}+{f_match.end('prefix')}c")
+            body = f_match.group('body')
+            current_pos = body_start
+            for part in re.finditer(r'(.*?)(\{.*?\}|$)', body):
+                literal = part.group(1)
+                expr = part.group(2)
+                if literal:
+                    lit_start = current_pos
+                    lit_end = lit_start + len(literal)
+                    string_spans.append((lit_start, lit_end))
+                    text.tag_add("string", f"{region_start}+{lit_start}c", f"{region_start}+{lit_end}c")
+                    current_pos = lit_end
+                if expr and expr.startswith('{'):
+                    expr_start = current_pos
+                    expr_end = current_pos + len(expr)
+                    current_pos = expr_end
+                    text.tag_remove("string", f"{region_start}+{expr_start}c", f"{region_start}+{expr_end}c")
+                    inner_text = expr[1:-1]
+                    inner_start = expr_start + 1
+                    for func_match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', inner_text):
+                        f_start = inner_start + func_match.start(1)
+                        f_end = inner_start + func_match.end(1)
+                        text.tag_add("funccall", f"{region_start}+{f_start}c", f"{region_start}+{f_end}c")
+                    text.tag_add("punctuation", f"{region_start}+{expr_start}c", f"{region_start}+{expr_start+1}c")
+                    text.tag_add("punctuation", f"{region_start}+{expr_end-1}c", f"{region_start}+{expr_end}c")
+                    for var_match in re.finditer(r'\b([a-zA-Z_]\w*)\b', inner_text):
+                        v_start = inner_start + var_match.start(1)
+                        v_end = inner_start + var_match.end(1)
+                        if not any(text.tag_names(f"{region_start}+{v_start}c")):
+                            text.tag_add("variable", f"{region_start}+{v_start}c", f"{region_start}+{v_end}c")
+                    for num_match in re.finditer(r'\b\d+\b', inner_text):
+                        n_start = inner_start + num_match.start()
+                        n_end = inner_start + num_match.end()
+                        text.tag_add("number", f"{region_start}+{n_start}c", f"{region_start}+{n_end}c")
+                    for dunder_match in re.finditer(r'\b(__\w+__)\b', inner_text):
+                        d_start = inner_start + dunder_match.start()
+                        d_end = inner_start + dunder_match.end()
+                        text.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
+
+    # --- Keywords, Functions, Function Calls, Variables ---
+    if keywords:
+        for match in re.finditer(r"\b(" + "|".join(map(re.escape, keywords)) + r")\b", content):
+            if not is_in_string_or_comment(match.start()):
+                text.tag_add("keyword", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+    if funcs:
+        for match in re.finditer(r"\b(" + "|".join(map(re.escape, funcs)) + r")\b", content):
+            if not is_in_string_or_comment(match.start()):
+                text.tag_add("function", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
     for match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', content):
         if not is_in_string_or_comment(match.start(1)):
-            text.tag_add("funccall", f"1.0+{match.start(1)}c", f"1.0+{match.end(1)}c")
-    
-    # Tag the variables (outside strings and not other tagged elements).
+            text.tag_add("funccall", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
     for match in re.finditer(r'\b([a-zA-Z_]\w*)\b', content):
         if is_in_string_or_comment(match.start()):
             continue
-        pos = f"1.0+{match.start()}c"
+        pos = f"{region_start}+{match.start()}c"
         if not any(text.tag_names(pos)):
-            text.tag_add("variable", f"1.0+{match.start()}c", f"1.0+{match.end()}c")
-            
+            text.tag_add("variable", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+
+    # --- HTML tags/attributes ---
     if language == "html":
         for match in re.finditer(r'<(\/?\w+)', content):
-            start = f"1.0+{match.start(1)}c"
-            end = f"1.0+{match.end(1)}c"
-            text.tag_add("html_tag", start, end)
+            text.tag_add("html_tag", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+        for match in re.finditer(html_attr_pattern, content):
+            text.tag_add("html_attr", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+    if language == "html":
+        for match in re.finditer(r'=\s*(".*?"|\'.*?\')', content):
+            s, e = match.start(1), match.end(1)
+            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
-        # Highlight HTML attributes.
-        for match in re.finditer(r'\b(' + '|'.join(html_attrs) + r')\s*=', content):
-            start = f"1.0+{match.start(1)}c"
-            end = f"1.0+{match.end(1)}c"
-            text.tag_add("html_attr", start, end)
-            
+    # --- Constants (ALLCAPS) ---
     if language in ['python', 'javascript', 'cpp']:
         for match in re.finditer(r'\b([A-Z][A-Z0-9_]*[A-Z][A-Z0-9_]*)\b', content):
             if not is_in_string_or_comment(match.start()):
-                text.tag_add("constant", f"1.0+{match.start(1)}c", f"1.0+{match.end(1)}c")
+                text.tag_add("constant", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
 
 themes = {
     'light': {
         'bg': '#ffffff', 'fg': '#000000',
         'keyword': '#0000ff', 'string': "#bf6900", 'comment': '#008000',
-        'function': '#800080', 'funccall': '#00008b', 'integer': '#ffa500',
+        'function': '#800080', 'funccall': '#00008b', 'integer': '#ffa500', 'member': '#7a1c15',
         'prefix': '#006400', 'line_numbers': '#f0f0f0', 'cursor': '#000000', 'type': "#0e3c8a",
-        'variable': '#000000', 'builtin': "#003a78", 'dunder': '#4F4F4F', 'pointer': "#2C3BC5",
-        'escape': '#404040', 'semicolon': "#4B4B4B", 'preprocessor': "#681968", 'preprocessor_rest': "#343434",
+        'variable': '#000000', 'builtin': "#003a78", 'dunder': '#4F4F4F', 'pointer': "#2c3bc5",
+        'escape': '#404040', 'semicolon': "#4b4b4b", 'preprocessor': "#681968", 'preprocessor_rest': "#343434",
         'html_tag': "#68177B", 'html_attr': "#074a7c", 'constant': "#d86919", 'template': "#083e3f", 'operator': "#237471",
     },
     'dark': {
         'bg': '#1e1e1e', 'fg': '#d4d4d4',
         'keyword': '#569cd6', 'string': '#ce9178', 'comment': '#6a9955',
-        'function': '#c586c0', 'funccall': '#4ec9b0', 'integer': '#b5cea8',
+        'function': '#c586c0', 'funccall': '#4ec9b0', 'integer': '#b5cea8', 'member': '#bd4840',
         'prefix': '#9cdcfe', 'line_numbers': '#2d2d2d', 'cursor': '#d4d4d4', 'type': "#6316cf",
         'variable': '#ffffff', 'builtin': "#60abfc", 'dunder': '#b0b0b0', 'pointer': "#4282e1",
-        'escape': "#7A7A7A", 'semicolon': "#A0A0A0", 'preprocessor': "#843E84", 'preprocessor_rest': "#636363",
+        'escape': "#7a7a7a", 'semicolon': "#a0a0a0", 'preprocessor': "#843E84", 'preprocessor_rest': "#636363",
         'html_tag': "#9625af", 'html_attr': "#0c79cd", 'constant': "#fc822b", 'template': "#2e7d71", 'operator': "#33c7c2",
     }
 }
@@ -517,6 +584,7 @@ def undo_action(event=None):
 def redo_action(event=None):
     try:
         text.edit_redo()
+        highlight_full_document()
     except tk.TclError:
         pass
 
@@ -606,11 +674,12 @@ def set_theme(theme_name):
     text.tag_configure("operator", foreground=theme['operator'])
     text.tag_configure("pointer", foreground=theme['pointer'])
     text.tag_configure("type", foreground=theme['type'])
+    text.tag_configure("member", foreground=theme['member'])
+    text.tag_raise("preprocessor_rest")
     text.tag_raise("prefix")
     text.tag_raise("brace")
     text.tag_raise("punctuation")
     text.tag_raise("number")
-    text.tag_raise("preprocessor_rest")
     text.tag_raise("comment")
 
 def find_text(event=None):
@@ -642,22 +711,28 @@ def find_text(event=None):
 
 
 def update_line_numbers(event=None):
-    line_numbers.config(state='normal')
-    line_numbers.delete('1.0', tk.END)
-    row_count = int(text.index('end-1c').split('.')[0])
-    line_numbers.config(width=len(str(row_count)) + 1)
-    line_numbers.insert('1.0', '\n'.join(str(i) for i in range(1, row_count + 1)))
-    line_numbers.config(state='disabled')
+    if text.edit_modified():
+        line_numbers.config(state='normal')
+        line_numbers.delete('1.0', tk.END)
+        row_count = int(text.index('end-1c').split('.')[0])
+        line_numbers.config(width=len(str(row_count)) + 1)
+        line_numbers.insert('1.0', '\n'.join(str(i) for i in range(1, row_count + 1)))
+        line_numbers.config(state='disabled')
+    text.edit_modified(False)
     
-def on_key_release(event):
-    if event.keysym != "Return":
-        update_line_numbers()
-    highlight(event)
+highlight_job = None
+debounce_delay = 100
+def on_key_release(event=None):
+    global highlight_job
+    if highlight_job is not None:
+        root.after_cancel(highlight_job)
+    highlight_job = root.after(debounce_delay, highlight_line)
+    update_line_numbers()
 
 text.unbind("<KeyRelease>")
 text.bind('<KeyRelease>', on_key_release)
 text.bind('<Configure>', update_line_numbers)
-text.bind("<<Paste>>", lambda e: (root.after(10, highlight)))
+text.bind("<<Paste>>", lambda e: (root.after(10, highlight_full_document)))
 text.bind('<Return>', auto_indent)
 text.bind('<BackSpace>', update_line_numbers)
 text.bind("<Control-o>", open_file)
@@ -666,8 +741,10 @@ text.bind("<Control-z>", undo_action)
 text.bind("<Control-y>", redo_action)
 text.bind("<Control-f>", find_text)
 text.bind("<Control-n>", new_file)
-root.bind("<Control-plus>", zoom_in)
 root.bind("<Control-minus>", zoom_out)
+root.bind("<Control-underscore>", zoom_out)
+root.bind("<Control-equal>", zoom_in)
+root.bind("<Control-plus>", zoom_in)
 
 update_line_numbers()
 
@@ -703,11 +780,15 @@ view_menu.add_command(label="Zoom Out", command=zoom_out, accelerator="Ctrl+-")
 language_var = tk.StringVar(value='plaintext')
 language_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="Language", menu=language_menu)
-language_menu.add_radiobutton(label="Plain Text", variable=language_var, value='plaintext', command=highlight)
-language_menu.add_radiobutton(label="Python", variable=language_var, value='python', command=highlight)
-language_menu.add_radiobutton(label="JavaScript", variable=language_var, value='javascript', command=highlight)
-language_menu.add_radiobutton(label="HTML", variable=language_var, value='html', command=highlight)
-language_menu.add_radiobutton(label="C++", variable=language_var, value='cpp', command=highlight)
+def highlight_language_change():
+    print(f"Highlighting as: {language_var.get()}")
+    root.after(10, highlight_full_document)
+
+language_menu.add_radiobutton(label="Plain Text", variable=language_var, value='plaintext', command=highlight_language_change)
+language_menu.add_radiobutton(label="Python", variable=language_var, value='python', command=highlight_language_change)
+language_menu.add_radiobutton(label="JavaScript", variable=language_var, value='javascript', command=highlight_language_change)
+language_menu.add_radiobutton(label="HTML", variable=language_var, value='html', command=highlight_language_change)
+language_menu.add_radiobutton(label="C++", variable=language_var, value='cpp', command=highlight_language_change)
 
 def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
@@ -755,6 +836,6 @@ else:
     set_theme('light')
 if session.get('language'):
     language_var.set(session['language'])
-highlight()
+highlight_full_document()
 
 root.mainloop()
