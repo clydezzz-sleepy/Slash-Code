@@ -300,7 +300,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             pattern = r'#.*|("""|\'\'\')[\s\S]*?\1'
         else:
             pattern = r'#.*'
-        for match in re.finditer(pattern, content, re.VERBOSE):
+        for match in re.finditer(pattern, content):
             s, e = match.start(), match.end()
             comment_spans.append((s, e))
             text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
@@ -309,10 +309,10 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             s, e = match.start(), match.end()
             comment_spans.append((s, e))
             text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
-            for match in re.finditer(r'/\*[\s\S]*?\*/', content):
-                s, e = match.start(), match.end()
-                comment_spans.append((s, e))
-                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        for match in re.finditer(r'/\*[\s\S]*?\*/', content):
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
     elif language == "html":
         for match in re.finditer(r'<!--.*?-->', content, re.DOTALL):
             s, e = match.start(), match.end()
@@ -329,27 +329,26 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
         
     # --- Strings ---    
-    if language == "cpp":
-        for match in re.finditer(r'"(?:[^"\\]|\\.)*"', content):
-            s, e = match.start(), match.end()
-            if not is_in_comment(s) and not is_in_preproc(s):
-                string_spans.append((s, e))
-                text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-                string_content = content[s:e]
-                for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', string_content):
-                    esc_s = s + esc_match.start()
-                    esc_e = s + esc_match.end()
-                    text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
+    for match in re.finditer(r'"(?:[^"\\]|\\.)*"', content):
+        s, e = match.start(), match.end()
+        if not is_in_comment(s) and not is_in_preproc(s):
+            string_spans.append((s, e))
+            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            string_content = content[s:e]
+            for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', string_content):
+                esc_s = s + esc_match.start()
+                esc_e = s + esc_match.end()
+                text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
     
-        for match in re.finditer(r"'(?:[^'\\]|\\.)'", content):
-            s, e = match.start(), match.end()
-            if not is_in_comment(s) and not is_in_preproc(s):
-                text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-                char_content = content[s:e]
-                for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', char_content):
-                    esc_s = s + esc_match.start()
-                    esc_e = s + esc_match.end()
-                    text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
+    for match in re.finditer(r"'(?:[^'\\]|\\.)'", content):
+        s, e = match.start(), match.end()
+        if not is_in_comment(s) and not is_in_preproc(s):
+            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            char_content = content[s:e]
+            for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', char_content):
+                esc_s = s + esc_match.start()
+                esc_e = s + esc_match.end()
+                text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
     
     # --- Operators ---       
     if language in ("cpp", "python", "javascript"):
