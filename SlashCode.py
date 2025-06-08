@@ -319,14 +319,24 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             comment_spans.append((s, e))
             text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
     elif language == "cpp":
+        for match in re.finditer(r'(?:L)?"(?:[^"\\]|\\.)*"', content):
+            s, e = match.start(), match.end()
+            string_spans.append((s, e))
+            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        for match in re.finditer(r"'(?:[^'\\]|\\.)'", content):
+            s, e = match.start(), match.end()
+            string_spans.append((s, e))
+            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
         for match in re.finditer(r'//.*', content):
             s, e = match.start(), match.end()
-            comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            if not any(str_s <= s < str_e for str_s, str_e in string_spans):
+                comment_spans.append((s, e))
+                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
         for match in re.finditer(r'/\*.*?\*/', content, re.DOTALL):
             s, e = match.start(), match.end()
-            comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            if not any(str_s <= s < str_e for str_s, str_e in string_spans):
+                comment_spans.append((s, e))
+                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c") 
         
     # --- Strings ---    
     for match in re.finditer(r'"(?:[^"\\]|\\.)*"', content):
