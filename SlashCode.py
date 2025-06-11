@@ -7,7 +7,6 @@ import builtins
 import os
 import json
 import sys
-from functools import lru_cache
 from tkinter import filedialog, scrolledtext
 
 root = tk.Tk()
@@ -20,6 +19,33 @@ else:
     icon = tk.PhotoImage(file=os.path.abspath("slash.png"))
     root.iconphoto(True, icon)
 root.title("Slash Code")
+
+class ToolTip:
+    def __init__(self):
+        self.tooltip_window = None
+    
+    def show(self, event, text):
+        if self.tooltip_window:
+            return
+        x = event.x_root + 10
+        y = event.y_root + 10
+        self.tooltip_window = tk.Toplevel()
+        self.tooltip_window.wm_overrideredirect(True)
+        self.tooltip_window.geometry(f"+{x}+{y}")
+        label = tk.Label(
+            self.tooltip_window, text=text,
+            background="lightgray" if theme_var == "dark" else "darkgray", relief="solid", borderwidth=1,
+            font=("Consolas", 9), wraplength=300
+        )
+        label.pack()
+    
+    def hide(self, event):
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
+
+tooltip_manager = ToolTip()
+
 
 LANGUAGE_KEYWORDS = {
     'python': set(keyword.kwlist),
@@ -60,7 +86,16 @@ LANGUAGE_KEYWORDS = {
         'dir', 'element', 'font', 'frame', 'frameset', 'image', 'isindex', 'keygen', 'listing', 'marquee',
         'menuitem', 'multicol', 'nextid', 'nobr', 'noembed', 'noframes', 'plaintext', 'rb', 'rtc',
         'shadow', 'spacer', 'strike', 'tt', 'xmp', 'object', 'param', 'source', 'embed', 'output'
-    }
+    },
+    'cs': {
+    'abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked', 'class', 'const', 'continue',
+    'decimal', 'default', 'delegate', 'do', 'double', 'else', 'enum', 'event', 'explicit', 'extern', 'false', 'finally',
+    'fixed', 'float', 'for', 'foreach', 'goto', 'if', 'implicit', 'in', 'int', 'interface', 'internal', 'is', 'lock',
+    'long', 'namespace', 'new', 'null', 'object', 'operator', 'out', 'override', 'params', 'private', 'protected',
+    'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string',
+    'struct', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort',
+    'using', 'virtual', 'void', 'volatile', 'while'
+}
 }
 
 LANGUAGE_FUNCS = {
@@ -102,7 +137,10 @@ LANGUAGE_FUNCS = {
         'cout', 'cin', 'endl', 
         'printf', 'scanf', 'fopen' # C functions in case they're used.
     },
-    'html': {} # HTML doesn't have any functions (you'd need to use JavaScript).
+    'html': {}, # HTML doesn't have any functions (you'd need to use JavaScript).
+    'cs': {
+    'Console.WriteLine', 'Console.ReadLine', 'Math.Abs', 'Math.Pow', 'Math.Sqrt', 'ToString', 'Equals', 'GetHashCode', 'GetType', 'Parse'
+    }
 }
 
 LANGUAGE_TYPES = {
@@ -117,7 +155,10 @@ LANGUAGE_TYPES = {
     "javascript": {
         "Number", "String", "Boolean", "Array", "Object", "Function", "Symbol", "BigInt"
     },
-    "html": set()
+    "html": set(),
+    "cs": {
+    'int', 'float', 'double', 'decimal', 'string', 'char', 'bool', 'object', 'var', 'dynamic', 'long', 'short', 'byte', 'uint', 'ulong', 'ushort', 'sbyte'
+    }
 }
 
 html_attrs = {
@@ -126,8 +167,328 @@ html_attrs = {
     'selected', 'required', 'readonly', 'autofocus', 'maxlength', 'min', 'max'
 } # Attributes like <div **style="...">.
 
+TOOLTIP_INFO = {
+    'python': {
+        'keywords': {
+            'def': 'Defines a function. This can be used in your script by calling it, using the name plus the parentheses -> (), that will execute the function.',
+            'class': 'Defines a class that you can use as an instance by making a variable that holds the value of the class.', 
+            'if': 'A conditional statement to check whether the condition after the if keyword is truthy or not.',
+            'else': 'A conditional statement that runs only if the previous conditions did not run as the conditions weren\'t truthy.',
+            'elif': 'An additional conditional statement to give a different conditional a chance to be run (if truthy) if the previous statement wasn\'t truthy.',
+            'for': 'Creates a loop inside of an iterable that ends after there isn\'t any more elements inside of the iterable. The use of the for statement is \"for i in some_iterable:\".',
+            'while': 'While a certain condition is truthy, the loop inside of the while block will keep running until it becomes false.',
+            'return': 'Returns a certain value from a function. This is useful as you can get the result of the output of the function inside of a variable so you can use it for other things.',
+            'import': 'Imports a module which you can use for different occurrences. People may import a module if something they need already exists in a public package/module.',
+            'from': 'Imports specific items from a module, not the entire module.',
+            'try': 'Attempts to run a code block while an exception doesn\'t occur.',
+            'except': 'Handles an exception detected from a try block. If the try block did not succeed in fully executing, the except block will be executed instead.',
+            'with': 'A context manager to execute code with.',
+            'as': 'Gives a certain alias to an item which you can use as that name as well.',
+            'lambda': 'An anonymous function that is not manually hardcoded by the user itself but more a function that has the purpose of just returning something.',
+        },
+        'functions': {
+            'print': 'Outputs text to console and buffers to the stream if the flush parameter isn\'t truthy. The object inputted inside of the print function will get parsed, evaluated and get converted into a string to properly print the output to the console.',
+            'len': 'Gets length of an object of an iterable, whether that may be an integer, list, set, etc. This can be used to check the amount of items in a huge list, for example.',
+            'range': 'Generates a sequence of numbers and can be used in a for loop to do something every time a loop finishes.',
+            'str': 'Converts an object to a string.',
+            'int': 'Converts an object to an integer',
+            'list': 'May be used as an object type specifier or may be used with parentheses to convert an object to a list of iterables.',
+            'dict': 'May be used as an object type specifier or may be used with parentheses to convert an object to a dictionary of key-value pairs.',
+            'open': 'Opens a file object with the type of TextIOWrapper[_WrappedBuffer] to convert the content of a file to a string for reading and writing. It is most likely you\'ll use the as keyword to genuinely execute an action with the file itself.',
+            'input': 'Gets user input and returns the text the user inputted into the stream. This may be used as a confirmation for something important or anything else.',
+            'type': 'Checks the type of the object and returns it.',
+        }
+    },
+    'javascript': {
+        'keywords': {
+            'function': 'Defines a function. Example: function myFunc() {}',
+            'var': 'Declares a variable (function-scoped).',
+            'let': 'Declares a block-scoped variable.',
+            'const': 'Declares a block-scoped, read-only variable.',
+            'if': 'Conditional statement.',
+            'else': 'Alternative block for if statement.',
+            'for': 'Creates a loop. Example: for (let i=0; i<5; i++) {}',
+            'while': 'Loop that runs while a condition is true.',
+            'do': 'Used with while for do...while loops.',
+            'switch': 'Selects among multiple cases.',
+            'case': 'Defines a case in a switch statement.',
+            'break': 'Exits a loop or switch.',
+            'continue': 'Skips to next loop iteration.',
+            'return': 'Returns a value from a function.',
+            'try': 'Starts a try...catch error handling block.',
+            'catch': 'Handles errors from try block.',
+            'finally': 'Executes after try/catch, regardless of outcome.',
+            'throw': 'Throws an exception.',
+            'class': 'Defines a class.',
+            'extends': 'Inherits from another class.',
+            'import': 'Imports a module.',
+            'export': 'Exports a module or function.',
+            'new': 'Creates a new instance of an object.',
+            'this': 'Refers to the current object.',
+            'super': 'Calls parent class constructor or method.',
+            'typeof': 'Returns the type of a variable.',
+            'instanceof': 'Checks object type at runtime.',
+            'delete': 'Deletes an object property.',
+            'in': 'Checks if a property exists in an object.',
+            'await': 'Waits for a Promise to resolve (async functions).',
+            'async': 'Declares an async function.',
+            'yield': 'Pauses and resumes a generator function.',
+            'default': 'Specifies default case in switch or default export.',
+            'with': 'Extends scope chain for a statement (deprecated).',
+            'void': 'Evaluates an expression without returning value.',
+            'enum': 'Defines an enumerated type.',
+            'static': 'Defines a static method or property.',
+            'public': 'Public class field (ES2022).',
+            'private': 'Private class field (ES2022).',
+            'protected': 'Protected class field (TypeScript/ES2022).',
+            'package': 'Reserved for future use.',
+            'interface': 'TypeScript: defines a contract for objects.'
+        },
+        'functions': {
+            'alert': 'Displays an alert dialog.',
+            'prompt': 'Displays a prompt dialog for user input.',
+            'confirm': 'Displays a confirmation dialog.',
+            'console.log': 'Logs output to the browser console.',
+            'setTimeout': 'Calls a function after a delay.',
+            'setInterval': 'Calls a function repeatedly at intervals.',
+            'clearTimeout': 'Cancels a timeout set by setTimeout.',
+            'clearInterval': 'Cancels an interval set by setInterval.',
+            'parseInt': 'Parses a string and returns an integer.',
+            'parseFloat': 'Parses a string and returns a floating-point number.',
+            'isNaN': 'Checks if a value is NaN (Not a Number).',
+            'isFinite': 'Checks if a value is a finite number.',
+            'JSON.stringify': 'Converts a JavaScript object to a JSON string.',
+            'JSON.parse': 'Parses a JSON string into a JavaScript object.',
+            'fetch': 'Performs HTTP requests (returns a Promise).',
+            'addEventListener': 'Adds an event listener to an element.',
+            'removeEventListener': 'Removes an event listener from an element.',
+            'querySelector': 'Selects the first element matching a CSS selector.',
+            'querySelectorAll': 'Selects all elements matching a CSS selector.',
+            'getElementById': 'Gets an element by its ID.',
+            'getElementsByClassName': 'Gets elements by class name.',
+            'getElementsByTagName': 'Gets elements by tag name.',
+            'map': 'Creates a new array by applying a function to each element.',
+            'filter': 'Creates a new array with elements that pass a test.',
+            'reduce': 'Reduces an array to a single value.',
+            'forEach': 'Executes a function for each array element.',
+            'Math.random': 'Returns a random number between 0 and 1.',
+            'Math.floor': 'Rounds a number down.',
+            'Math.ceil': 'Rounds a number up.',
+            'Math.round': 'Rounds a number to the nearest integer.',
+            'Math.abs': 'Returns the absolute value.'
+        }
+    },
+    'cpp': {
+        'keywords': {
+            'int': 'Integer data type.',
+            'float': 'Floating-point data type.',
+            'double': 'Double-precision floating-point.',
+            'char': 'Character data type.',
+            'void': 'No return value or type.',
+            'bool': 'Boolean data type (true/false).',
+            'class': 'Defines a class.',
+            'struct': 'Defines a structure.',
+            'enum': 'Defines an enumerated type.',
+            'namespace': 'Defines a namespace.',
+            'template': 'Defines a template for generic programming.',
+            'public': 'Public access specifier.',
+            'private': 'Private access specifier.',
+            'protected': 'Protected access specifier.',
+            'virtual': 'Declares a virtual function.',
+            'override': 'Overrides a virtual function.',
+            'const': 'Declares a constant value.',
+            'static': 'Declares a static member.',
+            'new': 'Allocates memory dynamically.',
+            'delete': 'Deallocates memory.',
+            'try': 'Begins a try-catch block.',
+            'catch': 'Catches exceptions.',
+            'throw': 'Throws an exception.',
+            'using': 'Introduces a namespace or alias.',
+            'return': 'Returns a value from a function.',
+            'if': 'Conditional statement.',
+            'else': 'Alternative block for if.',
+            'for': 'Loop with initialization, condition, increment.',
+            'while': 'Loop that runs while a condition is true.',
+            'do': 'Used with while for do...while loops.',
+            'break': 'Exits a loop.',
+            'continue': 'Skips to next loop iteration.',
+            'switch': 'Selects among multiple cases.',
+            'case': 'Defines a case in a switch statement.',
+            'default': 'Specifies default case in switch.',
+            'sizeof': 'Returns the size of a type or variable.',
+            'typedef': 'Creates a type alias.',
+            'friend': 'Grants access to private/protected members.',
+            'operator': 'Overloads an operator.',
+            'this': 'Pointer to the current object.',
+            'nullptr': 'Null pointer constant.',
+            'true': 'Boolean true value.',
+            'false': 'Boolean false value.'
+        },
+        'functions': {
+            'std::cout': 'Outputs to standard output (console).',
+            'std::cin': 'Inputs from standard input (console).',
+            'printf': 'C function for formatted output.',
+            'scanf': 'C function for formatted input.',
+            'main': 'Entry point of a C++ program.',
+            'sort': 'Sorts elements in a range.',
+            'find': 'Finds an element in a range.',
+            'push_back': 'Adds element to the end of a vector.',
+            'pop_back': 'Removes last element from a vector.',
+            'size': 'Returns the number of elements.',
+            'begin': 'Returns iterator to beginning.',
+            'end': 'Returns iterator to end.',
+            'abs': 'Returns the absolute value.',
+            'sqrt': 'Returns the square root.',
+            'pow': 'Raises to a power.',
+            'exit': 'Terminates the program.'
+        }
+    },
+    'html': {
+        'keywords': {
+            'html': 'Root element of an HTML page.',
+            'head': 'Container for metadata.',
+            'body': 'Main content of the document.',
+            'div': 'Generic container element.',
+            'span': 'Inline container element.',
+            'a': 'Defines a hyperlink.',
+            'img': 'Embeds an image.',
+            'script': 'Embeds or references JavaScript.',
+            'style': 'Defines CSS styles.',
+            'form': 'Defines an input form.',
+            'input': 'Single-line text input field.',
+            'button': 'Clickable button.',
+            'table': 'Table element.',
+            'tr': 'Table row.',
+            'td': 'Table cell.',
+            'th': 'Table header cell.',
+            'ul': 'Unordered list.',
+            'ol': 'Ordered list.',
+            'li': 'List item.',
+            'h1': 'Top-level heading.',
+            'h2': 'Second-level heading.',
+            'h3': 'Third-level heading.',
+            'p': 'Paragraph.',
+            'br': 'Line break.',
+            'link': 'Defines relationship to external resource (usually CSS).',
+            'meta': 'Specifies metadata.'
+        },
+        'functions': {}
+    },
+    'cs': {
+        'keywords': {
+            'class': 'Defines a class (blueprint for objects).',
+            'struct': 'Defines a value type structure.',
+            'interface': 'Defines a contract that classes/structs can implement.',
+            'enum': 'Defines an enumeration of named constants.',
+            'namespace': 'Declares a scope for identifiers.',
+            'using': 'Imports namespaces or creates an alias.',
+            'public': 'Access modifier: accessible from anywhere.',
+            'private': 'Access modifier: accessible only within the class.',
+            'protected': 'Access modifier: accessible in class and subclasses.',
+            'internal': 'Access modifier: accessible within the same assembly.',
+            'static': 'Belongs to the type itself, not an instance.',
+            'void': 'Indicates no return value.',
+            'int': '32-bit integer type.',
+            'float': 'Single-precision floating point type.',
+            'double': 'Double-precision floating point type.',
+            'decimal': '128-bit precise decimal type.',
+            'string': 'Sequence of characters.',
+            'char': 'Single character type.',
+            'bool': 'Boolean value (true/false).',
+            'object': 'Base type for all objects.',
+            'var': 'Implicitly typed local variable.',
+            'new': 'Creates a new instance.',
+            'return': 'Returns a value from a method.',
+            'if': 'Conditional statement.',
+            'else': 'Alternative block for if.',
+            'switch': 'Selects among multiple cases.',
+            'case': 'Defines a case in switch.',
+            'default': 'Default case in switch.',
+            'for': 'Loop with initializer, condition, increment.',
+            'foreach': 'Loop over items in a collection.',
+            'while': 'Loop while condition is true.',
+            'do': 'Do-while loop.',
+            'break': 'Exits a loop or switch.',
+            'continue': 'Skips to next iteration of loop.',
+            'try': 'Starts a try-catch-finally block.',
+            'catch': 'Handles exceptions from try block.',
+            'finally': 'Executes after try/catch, always runs.',
+            'throw': 'Throws an exception.',
+            'true': 'Boolean true value.',
+            'false': 'Boolean false value.',
+            'null': 'Represents no value.',
+            'this': 'Reference to current instance.',
+            'base': 'Reference to base class.',
+            'override': 'Overrides a base class method.',
+            'virtual': 'Allows method to be overridden.',
+            'abstract': 'Declares an abstract class or method.',
+            'sealed': 'Prevents a class from being inherited.',
+            'readonly': 'Value can only be assigned in declaration or constructor.',
+            'const': 'Constant value (must be assigned at declaration).',
+            'params': 'Specifies a method parameter that takes a variable number of arguments.',
+            'operator': 'Overloads an operator.',
+            'implicit': 'Defines an implicit conversion.',
+            'explicit': 'Defines an explicit conversion.',
+            'get': 'Accessor for a property.',
+            'set': 'Mutator for a property.',
+            'partial': 'Defines a partial class, struct, or method.',
+            'async': 'Defines an asynchronous method.',
+            'await': 'Waits for an async operation to complete.',
+            'lock': 'Ensures that one thread does not enter a critical section of code while another thread is in that section.',
+            'yield': 'Returns each element one at a time.',
+            'nameof': 'Returns the name of a variable, type, or member as a string.',
+            'typeof': 'Gets the System.Type of a type.',
+            'is': 'Checks if an object is compatible with a type.',
+            'as': 'Performs conversions between compatible types.',
+            'dynamic': 'Bypasses compile-time type checking.',
+            'delegate': 'Defines a type that references methods.',
+            'event': 'Declares an event.',
+            'extern': 'Declares a method that is implemented externally.',
+            'unsafe': 'Allows code that uses pointers.',
+            'fixed': 'Prevents the garbage collector from relocating a variable.',
+            'checked': 'Enables overflow checking for integral-type arithmetic operations.',
+            'unchecked': 'Suppresses overflow checking.',
+            'goto': 'Transfers control to a labeled statement.',
+            'sizeof': 'Returns the size in bytes of a type.',
+            'stackalloc': 'Allocates a block of memory on the stack.',
+            'add': 'Defines a custom event accessor.',
+            'remove': 'Defines a custom event accessor.',
+        },
+        'functions': {
+            'Console.WriteLine': 'Writes a line of text to the console.',
+            'Console.ReadLine': 'Reads a line of input from the console.',
+            'Math.Abs': 'Returns the absolute value of a number.',
+            'Math.Pow': 'Raises a number to a specified power.',
+            'Math.Sqrt': 'Returns the square root of a number.',
+            'ToString': 'Converts an object to its string representation.',
+            'Equals': 'Determines whether two object instances are equal.',
+            'GetHashCode': 'Returns a hash code for the object.',
+            'GetType': 'Gets the type of the current instance.',
+            'Parse': 'Converts a string to a numeric type.',
+            'TryParse': 'Tries to convert a string to a numeric type, returns success as bool.',
+            'Substring': 'Retrieves a substring from a string.',
+            'IndexOf': 'Reports the zero-based index of the first occurrence of a string.',
+            'Replace': 'Replaces all occurrences of a specified string.',
+            'Split': 'Splits a string into an array of substrings.',
+            'Join': 'Concatenates an array of strings.',
+            'Trim': 'Removes all leading and trailing white-space characters.',
+            'StartsWith': 'Determines whether the beginning of this string matches a specified string.',
+            'EndsWith': 'Determines whether the end of this string matches a specified string.',
+            'Contains': 'Checks if a string contains a specified substring.',
+            'Add': 'Adds an object to the end of a collection.',
+            'Remove': 'Removes the first occurrence of a specific object.',
+            'Insert': 'Inserts an element into the collection at the specified index.',
+            'Clear': 'Removes all elements from the collection.',
+            'Count': 'Gets the number of elements in the collection.',
+            'Sort': 'Sorts the elements in the collection.',
+            'Reverse': 'Reverses the order of the elements in the collection.',
+        }
+    }
+}
+
 def new_file(event=None):
     text.delete(1.0, tk.END)
+    update_line_numbers()
     root.title("Slash Code")
     
 current_file = ""
@@ -157,6 +518,7 @@ def open_file(event=None):
             if lang == 'plaintext':
                 lang = guess_language_from_content(code)
             language_var.set(lang)
+        update_line_numbers()
         highlight_full_document()
 
 def save_file(event=None):
@@ -245,47 +607,118 @@ def highlight_line(event=None):
     
 def highlight_full_document():
     highlight(full_document=True)
+    bind_tooltips()
+    
+def mask_comments(content, comment_spans):
+    chars = list(content)
+    for s, e in comment_spans:
+        for i in range(s, e):
+            chars[i] = " " 
+    return "".join(chars)
 
 def highlight(event=None, full_document=False, region_start=None, region_end=None, content=None):
     """
     If full_document is True, highlights the whole file.
     If False (default), highlights only the current line.
     """
+    if hasattr(text, "function_signatures"):
+        text.function_signatures.clear()
     language = language_var.get()
     keywords = LANGUAGE_KEYWORDS.get(language, set())
     funcs = LANGUAGE_FUNCS.get(language, set())
-    types = LANGUAGE_TYPES.get(language, set())
     html_attr_pattern = r'\b(' + '|'.join(html_attrs) + r')\s*='
 
     if full_document:
-        # Remove all tags before re-highlighting
         for tag in text.tag_names():
             text.tag_remove(tag, "1.0", tk.END)
         region_start = "1.0"
         region_end = tk.END
         content = text.get(region_start, region_end)
     elif region_start is None or region_end is None or content is None:
+        for tag in text.tag_names():
+            text.tag_remove(tag, "1.0", tk.END)
         line = text.index("insert").split('.')[0]
         region_start = f"{line}.0"
         region_end = f"{line}.end"
         content = text.get(region_start, region_end)
-        
+
     if language == "plaintext":
         return
 
     comment_spans = []
     string_spans = []
     preproc_spans = []
-    
+
     def is_in_comment(idx):
         return any(s <= idx < e for s, e in comment_spans)
-    
+
     def is_in_string_or_comment(idx):
         return any(s <= idx < e for s, e in comment_spans + string_spans)
-    
+
     def is_in_preproc(idx):
         return any(s <= idx < e for s, e in preproc_spans)
     
+    def is_in_string(idx):
+        return any(s <= idx < e for s, e in string_spans)
+
+    # --- Comments ---
+    if language == "python":
+        lines = content.split('\n')
+        current_pos = 0
+        for line in lines:
+            hash_pos = line.find('#')
+            if hash_pos != -1:
+                string_spans_in_line = []
+                for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', line):
+                    string_spans_in_line.append((match.start(), match.end()))
+                if not any(s <= hash_pos < e for s, e in string_spans_in_line):
+                    comment_start = current_pos + hash_pos
+                    comment_end = current_pos + len(line)
+                    comment_spans.append((comment_start, comment_end))
+                    text.tag_add("comment", f"{region_start}+{comment_start}c", f"{region_start}+{comment_end}c")
+            current_pos += len(line) + 1
+
+    elif language in ("javascript", "cpp", "cs"):
+        for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', content):
+            s, e = match.start(), match.end()
+            string_spans.append((s, e))
+
+        for match in re.finditer(r'//.*', content):
+            s, e = match.start(), match.end()
+            if is_in_string(s):
+                continue
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        if language in ("cpp", "cs"):
+            for match in re.finditer(r'/\*.*?\*/', content, re.DOTALL):
+                s, e = match.start(), match.end()
+                if is_in_string(s):
+                    continue
+                comment_spans.append((s, e))
+                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        
+    elif language == "html":
+        for match in re.finditer(r'<!--.*?-->', content, re.DOTALL):
+            s, e = match.start(), match.end()
+            comment_spans.append((s, e))
+            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+    masked_content = mask_comments(content, comment_spans)
+
+    # --- Strings ---
+    for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', masked_content):
+        s, e = match.start(), match.end()
+        string_spans.append((s, e))
+        text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+    # --- Operators ---       
+    if language in ("cpp", "python", "javascript", "cs"):
+        operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
+        for match in re.finditer(operator_pattern, content):
+            s, e = match.start(), match.end()
+            if not any(is_in_string_or_comment(i) for i in range(s, e)):
+                text.tag_add("operator", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                
     # --- Builtins ---
     if language == "python":
         builtins = LANGUAGE_FUNCS.get(language, set())
@@ -293,80 +726,6 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             for match in re.finditer(r"\b(" + "|".join(map(re.escape, builtins)) + r")\b", content):
                 if not is_in_string_or_comment(match.start()):
                     text.tag_add("builtin", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
-
-    # --- Comments ---
-    if language == "python":
-        if full_document:
-            pattern = r'#.*|("""|\'\'\')[\s\S]*?\1'
-        else:
-            pattern = r'#.*'
-        for match in re.finditer(pattern, content):
-            s, e = match.start(), match.end()
-            comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
-    elif language == "javascript":
-        for match in re.finditer(r'//.*$', content, re.MULTILINE):
-            s, e = match.start(), match.end()
-            comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
-        for match in re.finditer(r'/\*[\s\S]*?\*/', content):
-            s, e = match.start(), match.end()
-            comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
-    elif language == "html":
-        for match in re.finditer(r'<!--.*?-->', content, re.DOTALL):
-            s, e = match.start(), match.end()
-            comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
-    elif language == "cpp":
-        for match in re.finditer(r'(?:L)?"(?:[^"\\]|\\.)*"', content):
-            s, e = match.start(), match.end()
-            string_spans.append((s, e))
-            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-        for match in re.finditer(r"'(?:[^'\\]|\\.)'", content):
-            s, e = match.start(), match.end()
-            string_spans.append((s, e))
-            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-        for match in re.finditer(r'//.*', content):
-            s, e = match.start(), match.end()
-            if not any(str_s <= s < str_e for str_s, str_e in string_spans):
-                comment_spans.append((s, e))
-                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
-        for match in re.finditer(r'/\*.*?\*/', content, re.DOTALL):
-            s, e = match.start(), match.end()
-            if not any(str_s <= s < str_e for str_s, str_e in string_spans):
-                comment_spans.append((s, e))
-                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c") 
-        
-    # --- Strings ---    
-    for match in re.finditer(r'"(?:[^"\\]|\\.)*"', content):
-        s, e = match.start(), match.end()
-        if not is_in_comment(s) and not is_in_preproc(s):
-            string_spans.append((s, e))
-            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-            string_content = content[s:e]
-            for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', string_content):
-                esc_s = s + esc_match.start()
-                esc_e = s + esc_match.end()
-                text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
-    
-    for match in re.finditer(r"'(?:[^'\\]|\\.)'", content):
-        s, e = match.start(), match.end()
-        if not is_in_comment(s) and not is_in_preproc(s):
-            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-            char_content = content[s:e]
-            for esc_match in re.finditer(r'\\(["\'ntr0b\\\\]|x[0-9A-Fa-f]{2}|[0-7]{1,3})', char_content):
-                esc_s = s + esc_match.start()
-                esc_e = s + esc_match.end()
-                text.tag_add("escape", f"{region_start}+{esc_s}c", f"{region_start}+{esc_e}c")
-    
-    # --- Operators ---       
-    if language in ("cpp", "python", "javascript"):
-        operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|,|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
-        for match in re.finditer(operator_pattern, content):
-            s, e = match.start(), match.end()
-            if not any(is_in_string_or_comment(i) for i in range(s, e)):
-                text.tag_add("operator", f"{region_start}+{s}c", f"{region_start}+{e}c")
             
     # --- Semicolons (C++, JavaScript) ---
     for match in re.finditer(r';', content):
@@ -375,7 +734,6 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             text.tag_add("semicolon", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
     # --- Preprocessor (C++) ---
-    
     if language == "cpp":
         pattern = r'^[ \t]*#(define|undef|include|if|ifdef|ifndef|else|elif|endif|error|pragma|line|using|import|module)\b([^\n]*)'
         for match in re.finditer(pattern, content, re.MULTILINE):
@@ -391,21 +749,18 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 rest_end = e
                 if rest_start < rest_end:
                     text.tag_add("preprocessor_rest", f"{region_start}+{rest_start}c", f"{region_start}+{rest_end}c")
-                # Record the whole preprocessor line as a span
                 preproc_spans.append((s, e))
 
     # --- Templates (C++) ---
     if language == "cpp":
-        # Match identifiers followed by '<' (but not operators like << or <=)
         id_pattern = re.compile(r'\b([A-Za-z_][A-Za-z0-9_:]*)\s*<(?![<=])')
         for id_match in id_pattern.finditer(content):
             identifier = id_match.group(1)
             if identifier in keywords or identifier in funcs:
-                continue  # Skip keywords/functions
+                continue 
             open_angle = id_match.end() - 1
             if is_in_string_or_comment(open_angle):
                 continue
-            # Limit search to 200 characters to avoid runaway highlighting
             max_search = min(len(content), open_angle + 200)
             depth = 0
             for i in range(open_angle, max_search):
@@ -425,12 +780,11 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 text.tag_add("pointer", f"{region_start}+{ptr_start}c", f"{region_start}+{ptr_end}c")
                 
     # --- Members ---
-    for match in re.finditer(r'\.(\w+)\b(?!\s*\()', content):
+    for match in re.finditer(r'(?<!\d)\.(\w+)\b(?!\s*\()', content):
         member_start = match.start(1)
         member_end = match.end(1)
         if not is_in_string_or_comment(member_start):
             text.tag_add("member", f"{region_start}+{member_start}c", f"{region_start}+{member_end}c")
-
 
     # --- Dunder Methods ---
     for match in re.finditer(r'\b(__\w+__)\b', content):
@@ -493,15 +847,25 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                         d_end = inner_start + dunder_match.end()
                         text.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
 
-    # --- Keywords, Functions, Function Calls, Variables ---
+    # --- Keywords, Functions, Class Names, Function Calls, Variables ---
     if keywords:
         for match in re.finditer(r"\b(" + "|".join(map(re.escape, keywords)) + r")\b", content):
             if not is_in_string_or_comment(match.start()):
+                tag_start = f"{region_start}+{match.start()}c"
+                tag_end = f"{region_start}+{match.end()}c"
                 text.tag_add("keyword", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+                text.tag_add(f"kw_{match.group(0)}", tag_start, tag_end)
+    if language == "python":
+        for match in re.finditer(r'\bclass\s+([A-Za-z_][A-Za-z0-9_]*)', content):
+            name_start = match.start(1)
+            name_end = match.end(1)
+            if not is_in_string_or_comment(name_start):
+                text.tag_add("classname", f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
     if funcs:
         for match in re.finditer(r"\b(" + "|".join(map(re.escape, funcs)) + r")\b", content):
             if not is_in_string_or_comment(match.start()):
                 text.tag_add("function", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+                text.tag_add(f"fn_{match.group(0)}", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
     for match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', content):
         if not is_in_string_or_comment(match.start(1)):
             text.tag_add("funccall", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
@@ -511,6 +875,32 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
         pos = f"{region_start}+{match.start()}c"
         if not any(text.tag_names(pos)):
             text.tag_add("variable", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+    
+    # --- Tooltips ---
+    if language == "python":
+        for match in re.finditer(
+        r'\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(?:->\s*([^:]+?))?:', content
+        ):
+            func_name = match.group(1)
+            params = match.group(2)
+            return_type = match.group(3)
+            name_start = match.start(1)
+            name_end = match.end(1)
+            tag_name = f"defsig_{func_name}"
+            text.tag_add(tag_name, f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
+            after_def = content[match.end():]
+            docstring_match = re.match(r'\s*("""|\'\'\')(.*?)\1', after_def, re.DOTALL)
+            docstring = docstring_match.group(2).strip() if docstring_match else ""
+            signature = f"{func_name}({params})"
+            if return_type:
+                signature += f" -> {return_type}"
+            else:
+                signature += " -> UnanalyzableType"
+            if docstring:
+               signature += f"\n\n{docstring}"
+            if not hasattr(text, "function_signatures"):
+                text.function_signatures = {}
+            text.function_signatures[func_name] = signature
 
     # --- HTML tags/attributes ---
     if language == "html":
@@ -528,6 +918,9 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
         for match in re.finditer(r'\b([A-Z][A-Z0-9_]*[A-Z][A-Z0-9_]*)\b', content):
             if not is_in_string_or_comment(match.start()):
                 text.tag_add("constant", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+    for s, e in comment_spans:
+        text.tag_remove("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+    text.tag_raise("comment")
 
 themes = {
     'light': {
@@ -535,7 +928,7 @@ themes = {
         'keyword': '#0000ff', 'string': "#bf6900", 'comment': '#008000',
         'function': '#800080', 'funccall': '#00008b', 'integer': '#ffa500', 'member': '#7a1c15',
         'prefix': '#006400', 'line_numbers': '#f0f0f0', 'cursor': '#000000', 'type': "#0e3c8a",
-        'variable': '#000000', 'builtin': "#003a78", 'dunder': '#4F4F4F', 'pointer': "#2c3bc5",
+        'variable': '#000000', 'builtin': "#003a78", 'dunder': '#4F4F4F', 'pointer': "#2c3bc5", 'classname': "#e99235",
         'escape': '#404040', 'semicolon': "#4b4b4b", 'preprocessor': "#681968", 'preprocessor_rest': "#343434",
         'html_tag': "#68177B", 'html_attr': "#074a7c", 'constant': "#d86919", 'template': "#083e3f", 'operator': "#237471",
     },
@@ -544,7 +937,7 @@ themes = {
         'keyword': '#569cd6', 'string': '#ce9178', 'comment': '#6a9955',
         'function': '#c586c0', 'funccall': '#4ec9b0', 'integer': '#b5cea8', 'member': '#bd4840',
         'prefix': '#9cdcfe', 'line_numbers': '#2d2d2d', 'cursor': '#d4d4d4', 'type': "#6316cf",
-        'variable': '#ffffff', 'builtin': "#60abfc", 'dunder': '#b0b0b0', 'pointer': "#4282e1",
+        'variable': '#ffffff', 'builtin': "#60abfc", 'dunder': '#b0b0b0', 'pointer': "#4282e1", 'classname': "#B14B15",
         'escape': "#7a7a7a", 'semicolon': "#a0a0a0", 'preprocessor': "#843E84", 'preprocessor_rest': "#636363",
         'html_tag': "#9625af", 'html_attr': "#0c79cd", 'constant': "#fc822b", 'template': "#2e7d71", 'operator': "#33c7c2",
     }
@@ -683,6 +1076,7 @@ def set_theme(theme_name):
     text.tag_configure("operator", foreground=theme['operator'])
     text.tag_configure("pointer", foreground=theme['pointer'])
     text.tag_configure("type", foreground=theme['type'])
+    text.tag_configure("classname", foreground=theme['classname'])
     text.tag_configure("member", foreground=theme['member'])
     text.tag_raise("preprocessor_rest")
     text.tag_raise("prefix")
@@ -718,6 +1112,35 @@ def find_text(event=None):
     tk.Button(find_win, text="Find All", command=do_find).pack(side=tk.LEFT)
     entry.focus_set()
 
+def bind_tooltips():
+    lang = language_var.get()
+    info = TOOLTIP_INFO.get(lang, {})
+    kw_info = info.get('keywords', {})
+    fn_info = info.get('functions', {})
+
+    # Remove ALL previous bindings
+    for tag in text.tag_names():
+        try:
+            text.tag_unbind(tag, "<Enter>")
+            text.tag_unbind(tag, "<Leave>")
+        except:
+            pass
+
+    # Bind tooltips properly
+    for kw, desc in kw_info.items():
+        tag_name = f"kw_{kw}"
+        text.tag_bind(tag_name, "<Enter>", lambda e, desc=desc: tooltip_manager.show(e, desc))
+        text.tag_bind(tag_name, "<Leave>", tooltip_manager.hide)
+
+    for fn, desc in fn_info.items():
+        tag_name = f"fn_{fn}"
+        text.tag_bind(tag_name, "<Enter>", lambda e, desc=desc: tooltip_manager.show(e, desc))
+        text.tag_bind(tag_name, "<Leave>", tooltip_manager.hide)
+    if hasattr(text, "function_signatures"):
+        for func_name, signature in text.function_signatures.items():
+            tag_name = f"defsig_{func_name}"
+            text.tag_bind(tag_name, "<Enter>", lambda e, sig=signature: tooltip_manager.show(e, sig))
+            text.tag_bind(tag_name, "<Leave>", tooltip_manager.hide)
 
 def update_line_numbers(event=None):
     if text.edit_modified():
@@ -730,12 +1153,16 @@ def update_line_numbers(event=None):
     text.edit_modified(False)
     
 highlight_job = None
-debounce_delay = 100
+debounce_delay = 300
 def on_key_release(event=None):
     global highlight_job
     if highlight_job is not None:
         root.after_cancel(highlight_job)
-    highlight_job = root.after(debounce_delay, highlight_line)
+    content_size = len(text.get("1.0", tk.END))
+    if content_size < 5000:
+        highlight_job = root.after(debounce_delay, highlight_full_document)
+    else:
+        highlight_job = root.after(debounce_delay, highlight_line)
     update_line_numbers()
 
 text.unbind("<KeyRelease>")
@@ -798,6 +1225,7 @@ language_menu.add_radiobutton(label="Python", variable=language_var, value='pyth
 language_menu.add_radiobutton(label="JavaScript", variable=language_var, value='javascript', command=highlight_language_change)
 language_menu.add_radiobutton(label="HTML", variable=language_var, value='html', command=highlight_language_change)
 language_menu.add_radiobutton(label="C++", variable=language_var, value='cpp', command=highlight_language_change)
+language_menu.add_radiobutton(label="C#", variable=language_var, value='cs', command=highlight_language_change)
 
 def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
