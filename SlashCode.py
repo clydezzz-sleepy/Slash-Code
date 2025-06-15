@@ -6,8 +6,11 @@ import keyword
 import builtins
 import os
 import json
+import subprocess
+import tempfile
 import sys
-from tkinter import filedialog, scrolledtext
+import platform
+from tkinter import filedialog, scrolledtext, messagebox, ttk
 
 root = tk.Tk()
 if os.name == "nt" and sys.executable != "":
@@ -16,8 +19,11 @@ if os.name == "nt" and sys.executable != "":
     except Exception:
         pass
 else:
-    icon = tk.PhotoImage(file=os.path.abspath("slash.png"))
-    root.iconphoto(True, icon)
+    try:
+       icon = tk.PhotoImage(file=os.path.abspath("slash.png"))
+       root.iconphoto(True, icon)
+    except Exception:
+        pass
 root.title("Slash Code")
 
 class ToolTip:
@@ -710,6 +716,13 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
         s, e = match.start(), match.end()
         string_spans.append((s, e))
         text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        escape_pattern = r'\\(\\|[abfnrtv\'"0-9xuU])'
+        for s, e in string_spans:
+            string_text = content[s:e]
+            for esc in re.finditer(escape_pattern, string_text):
+                esc_start = s + esc.start()
+                esc_end = s + esc.end()
+                text.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
 
     # --- Operators ---       
     if language in ("cpp", "python", "javascript", "cs"):
@@ -774,7 +787,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
 
     # --- Pointers/References (C++) ---
     if language == "cpp":
-        for match in re.finditer(r'\b([A-Za-z_][A-Za-z0-9_:]*)\s*(\*+|&)(?=\s*\w)', content):
+        for match in re.finditer(r'\b([A-Za-z_:][\w:<>]*)\s*(\*+|&)(?=\s*\w)', content):
             ptr_start, ptr_end = match.start(2), match.end(2)
             if not is_in_string_or_comment(ptr_start):
                 text.tag_add("pointer", f"{region_start}+{ptr_start}c", f"{region_start}+{ptr_end}c")
@@ -827,6 +840,10 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                     text.tag_remove("string", f"{region_start}+{expr_start}c", f"{region_start}+{expr_end}c")
                     inner_text = expr[1:-1]
                     inner_start = expr_start + 1
+                    for str_match in re.finditer(r"(['\"])(?:\\.|[^\\])*?\1", inner_text):
+                        s = inner_start + str_match.start()
+                        e = inner_start + str_match.end()
+                        text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
                     for func_match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', inner_text):
                         f_start = inner_start + func_match.start(1)
                         f_end = inner_start + func_match.end(1)
@@ -846,6 +863,12 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                         d_start = inner_start + dunder_match.start()
                         d_end = inner_start + dunder_match.end()
                         text.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
+                    if language in ("cpp", "python", "javascript", "cs"):
+                        operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
+                        for operator_match in re.finditer(operator_pattern, inner_text):
+                            o_start = inner_start + operator_match.start()
+                            o_end = inner_start + operator_match.end()
+                            text.tag_add("operator", f"{region_start}+{o_start}c", f"{region_start}+{o_end}c")
 
     # --- Keywords, Functions, Class Names, Function Calls, Variables ---
     if keywords:
@@ -855,7 +878,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 tag_end = f"{region_start}+{match.end()}c"
                 text.tag_add("keyword", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
                 text.tag_add(f"kw_{match.group(0)}", tag_start, tag_end)
-    if language == "python":
+    if language in ("python", "cs", "cpp", "javascript"):
         for match in re.finditer(r'\bclass\s+([A-Za-z_][A-Za-z0-9_]*)', content):
             name_start = match.start(1)
             name_end = match.end(1)
@@ -940,8 +963,45 @@ themes = {
         'variable': '#ffffff', 'builtin': "#60abfc", 'dunder': '#b0b0b0', 'pointer': "#4282e1", 'classname': "#B14B15",
         'escape': "#7a7a7a", 'semicolon': "#a0a0a0", 'preprocessor': "#843E84", 'preprocessor_rest': "#636363",
         'html_tag': "#9625af", 'html_attr': "#0c79cd", 'constant': "#fc822b", 'template': "#2e7d71", 'operator': "#33c7c2",
+    },
+    'dracula': {
+        'bg': '#282a36', 'fg': '#f8f8f2',
+        'keyword': '#ff79c6', 'string': '#f1fa8c', 'comment': '#6272a4',
+        'function': '#8be9fd', 'funccall': '#50fa7b', 'integer': '#bd93f9', 'member': '#ffb86c',
+        'prefix': '#bd93f9', 'line_numbers': '#44475a', 'cursor': '#f8f8f2', 'type': "#8be9fd",
+        'variable': '#f8f8f2', 'builtin': "#ffb86c", 'dunder': '#bd93f9', 'pointer': "#50fa7b", 'classname': "#ffb86c",
+        'escape': '#ff5555', 'semicolon': "#44475a", 'preprocessor': "#ff79c6", 'preprocessor_rest': "#44475a",
+        'html_tag': "#ff79c6", 'html_attr': "#8be9fd", 'constant': "#bd93f9", 'template': "#50fa7b", 'operator': "#ff79c6",
+    },
+    'monokai': {
+        'bg': '#272822', 'fg': '#f8f8f2',
+        'keyword': '#f92672', 'string': '#e6db74', 'comment': '#75715e',
+        'function': '#a6e22e', 'funccall': '#fd971f', 'integer': '#ae81ff', 'member': '#66d9ef',
+        'prefix': '#fd971f', 'line_numbers': '#3e3d32', 'cursor': '#f8f8f0', 'type': "#66d9ef",
+        'variable': '#f8f8f2', 'builtin': "#fd971f", 'dunder': '#75715e', 'pointer': "#a6e22e", 'classname': "#a6e22e",
+        'escape': '#fd5ff0', 'semicolon': "#75715e", 'preprocessor': "#f92672", 'preprocessor_rest': "#75715e",
+        'html_tag': "#f92672", 'html_attr': "#a6e22e", 'constant': "#ae81ff", 'template': "#66d9ef", 'operator': "#f92672",
+    },
+    'night_owl': {
+        'bg': '#011627', 'fg': '#d6deeb',
+        'keyword': '#c792ea', 'string': '#ecc48d', 'comment': '#637777',
+        'function': '#82aaff', 'funccall': '#7fdbca', 'integer': '#f78c6c', 'member': '#addb67',
+        'prefix': '#7fdbca', 'line_numbers': '#1d3b53', 'cursor': '#d6deeb', 'type': "#21c7a8",
+        'variable': '#d6deeb', 'builtin': "#7fdbca", 'dunder': '#637777', 'pointer': "#82aaff", 'classname': "#ffeb95",
+        'escape': '#c792ea', 'semicolon': "#637777", 'preprocessor': "#c792ea", 'preprocessor_rest': "#637777",
+        'html_tag': "#82aaff", 'html_attr': "#addb67", 'constant': "#f78c6c", 'template': "#21c7a8", 'operator': "#c792ea",
+    },
+    'shades_of_purple': {
+        'bg': '#2d2b55', 'fg': '#ffffff',
+        'keyword': '#a599e9', 'string': '#fcbf6b', 'comment': '#b362ff',
+        'function': '#f97e72', 'funccall': '#43d9ad', 'integer': '#ff628c', 'member': '#fdfd97',
+        'prefix': '#43d9ad', 'line_numbers': '#22223b', 'cursor': '#ffffff', 'type': "#a599e9",
+        'variable': '#ffffff', 'builtin': "#43d9ad", 'dunder': '#b362ff', 'pointer': "#a599e9", 'classname': "#fcbf6b",
+        'escape': '#b362ff', 'semicolon': "#a599e9", 'preprocessor': "#f97e72", 'preprocessor_rest': "#22223b",
+        'html_tag': "#a599e9", 'html_attr': "#43d9ad", 'constant': "#fcbf6b", 'template': "#43d9ad", 'operator': "#a599e9",
     }
 }
+
         
 def auto_indent(event):
     text = event.widget
@@ -1010,7 +1070,7 @@ line_numbers = tk.Text(
 
 line_numbers.pack(side=tk.LEFT, fill=tk.Y)
 text = scrolledtext.ScrolledText(frame, font=font, undo=True)
-text.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 text.bind("<Return>", auto_indent)
 text.bind("}", handle_closing_brace)
 
@@ -1039,18 +1099,123 @@ def on_scroll(event):
     update_line_numbers()
 text.bind("<MouseWheel>", on_scroll)
 
-
 text.bind("<Button-4>", on_scroll)
 text.bind("<Button-5>", on_scroll)
 
 current_theme = 'light'
 theme_var = tk.StringVar(value=current_theme)
+
+sidebar = tk.Frame(frame, width=200, bg=themes[theme_var.get()]['bg'])
+sidebar.pack(side=tk.RIGHT, fill=tk.Y)
+
+tree = ttk.Treeview(sidebar)
+tree.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+
+scrollbar = tk.Scrollbar(sidebar, orient="vertical", command=tree.yview)
+tree.configure(yscrollcommand=scrollbar.set)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+def open_selected_file(event=None):
+    sel = file_listbox.curselection()
+    if sel:
+        fname = file_listbox.get(sel[0])
+        folder = getattr(file_listbox, 'folder_path', None)
+        if folder:
+            fpath = os.path.join(folder, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    text.delete("1.0", tk.END)
+                    text.insert("1.0", f.read())
+                highlight_full_document()
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not open file:\n{e}")
+
+file_listbox = tk.Listbox(sidebar, width=30, bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'], selectbackground=themes[theme_var.get()]['keyword'])
+file_listbox.bind("<<ListboxSelect>>", open_selected_file)
+file_listbox.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+
+def insert_nodes(parent, path):
+    try:
+        for name in sorted(os.listdir(path)):
+            abspath = os.path.join(path, name)
+            isdir = os.path.isdir(abspath)
+            node = tree.insert(parent, "end", text=name, open=False)
+            if isdir:
+                tree.insert(node, "end")
+    except Exception:
+        pass
+
+def get_full_path(node):
+    path = ""
+    while node:
+        name = tree.item(node, "text")
+        path = os.path.join(name, path) if path else name
+        node = tree.parent(node)
+    return os.path.abspath(path)
+
+def on_tree_double_click(event=None):
+    node = tree.focus()
+    path = get_full_path(node)
+    if os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                text.delete("1.0", tk.END)
+                text.insert("1.0", f.read())
+            highlight_full_document()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open file:\n{e}")
+
+tree.bind("<Double-1>", on_tree_double_click)
+
+def open_folder():
+    folder = filedialog.askdirectory()
+    if folder:
+        tree.delete(*tree.get_children())
+        root_node = tree.insert("", "end", text=folder, open=True)
+        insert_nodes(root_node, folder)
+        file_listbox.folder_path = folder
+
+def on_open_node(event):
+    node = tree.focus()
+    path = get_full_path(node)
+    if tree.get_children(node):
+        first_child = tree.get_children(node)[0]
+        if not tree.get_children(first_child):
+            tree.delete(first_child)
+            insert_nodes(node, path)
+
+tree.bind("<<TreeviewOpen>>", on_open_node)
+
+open_folder_btn = tk.Button(
+    sidebar,
+    text="Open Folder",
+    command=open_folder,
+    bg=themes[theme_var.get()]['bg'],
+    fg=themes[theme_var.get()]['fg']
+)
+open_folder_btn.pack(fill=tk.X, pady=4)
+
 def set_theme(theme_name):
     global current_theme
     current_theme = theme_name
     theme = themes[theme_name]
     text.config(bg=theme['bg'], fg=theme['fg'], insertbackground=theme['cursor'])
     line_numbers.config(bg=theme['line_numbers'], fg=theme['fg'])
+    file_listbox.config(bg=theme['line_numbers'], fg=theme['fg'], selectbackground=theme['keyword'])
+    style = ttk.Style()
+    style.theme_use('clam')
+    style.configure("Treeview",
+        background=theme['bg'],
+        foreground=theme['fg'],
+        fieldbackground=theme['bg'],
+        highlightthickness=0,
+        borderwidth=0
+    )
+    style.map("Treeview",
+        background=[('selected', theme['keyword'])],
+        foreground=[('selected', theme['fg'])]
+    )
+    sidebar.config(bg=theme['bg'])
 
     text.tag_configure("keyword", foreground=theme['keyword'])
     text.tag_configure("comment", foreground=theme['comment'])
@@ -1117,8 +1282,6 @@ def bind_tooltips():
     info = TOOLTIP_INFO.get(lang, {})
     kw_info = info.get('keywords', {})
     fn_info = info.get('functions', {})
-
-    # Remove ALL previous bindings
     for tag in text.tag_names():
         try:
             text.tag_unbind(tag, "<Enter>")
@@ -1126,7 +1289,6 @@ def bind_tooltips():
         except:
             pass
 
-    # Bind tooltips properly
     for kw, desc in kw_info.items():
         tag_name = f"kw_{kw}"
         text.tag_bind(tag_name, "<Enter>", lambda e, desc=desc: tooltip_manager.show(e, desc))
@@ -1141,6 +1303,171 @@ def bind_tooltips():
             tag_name = f"defsig_{func_name}"
             text.tag_bind(tag_name, "<Enter>", lambda e, sig=signature: tooltip_manager.show(e, sig))
             text.tag_bind(tag_name, "<Leave>", tooltip_manager.hide)
+            
+def install_runner(lang):
+    if platform.system() == "Windows":
+        if lang == "javascript":
+            try:
+                subprocess.run(["node", "--version"], capture_output=True, check=True)
+                return True
+            except:
+                pass
+            try:
+                subprocess.run(["winget", "install", "-e", "--id", "OpenJS.NodeJS"], check=True, shell=True)
+                return True
+            except Exception:
+                try:
+                    subprocess.run(["choco", "install", "nodejs", "-y"], check=True, shell=True)
+                    return True
+                except Exception:
+                    return False
+        elif lang == "cpp":
+            try:
+                subprocess.run(["g++", "--version"], capture_output=True, check=True)
+                return True
+            except:
+                pass
+            try:
+                subprocess.run(["winget", "install", "-e", "--id", "MSYS2.MSYS2"], check=True, shell=True)
+                print("MSYS2 installed. Please install MinGW via MSYS2 shell: pacman -S mingw-w64-x86_64-gcc")
+                return False
+            except Exception:
+                return False
+        elif lang == "cs":
+            try:
+                subprocess.run(["csc"], capture_output=True, check=True)
+                return True
+            except:
+                pass
+            try:
+                subprocess.run(["winget", "install", "-e", "--id", "Microsoft.DotNet.SDK.8"], check=True, shell=True)
+                return True
+            except Exception:
+                try:
+                    subprocess.run(["choco", "install", "dotnetcore-sdk", "-y"], check=True, shell=True)
+                    return True
+                except Exception:
+                    return False
+    return False
+
+def run_code():
+    code = text.get("1.0", tk.END).strip()
+    lang = language_var.get()
+    output_window = tk.Toplevel(root)
+    output_window.title("Output")
+    output_text = tk.Text(output_window, font=font)
+    output_text.pack(fill=tk.BOTH, expand=True)
+
+    def show_error(message):
+        output_text.insert(tk.END, f"Error: {message}\n")
+
+    def check_runner(runner_name, check_cmd, install_instructions):
+        try:
+            subprocess.run(check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except FileNotFoundError:
+            output_text.insert(tk.END, 
+                f"{runner_name} not found!\n"
+                f"Please install it first.\n"
+                f"Instructions: {install_instructions}\n"
+            )
+            return False
+
+    try:
+        if lang == "python":
+            import io
+            old_stdout = sys.stdout
+            sys.stdout = mystdout = io.StringIO()
+            try:
+                exec(code, {})
+            except Exception as e:
+                print(e)
+            sys.stdout = old_stdout
+            output = mystdout.getvalue()
+
+        elif lang == "javascript":
+            if not check_runner("Node.js", ["node", "--version"], 
+                              "https://nodejs.org"):
+                return
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+                f.write(code)
+                f.flush()
+                result = subprocess.run(["node", f.name], capture_output=True, text=True)
+            output = result.stdout + result.stderr
+
+        elif lang == "cpp":
+            if not check_runner("G++ compiler", ["g++", "--version"],
+                              "https://sourceforge.net/projects/mingw/"):
+                return
+            with tempfile.NamedTemporaryFile("w", suffix=".cpp", delete=False) as f:
+                f.write(code)
+                f.flush()
+                exe_file = f.name + ".exe"
+                compile_result = subprocess.run(
+                    ["g++", f.name, "-o", exe_file],
+                    capture_output=True,
+                    text=True
+                )
+                if compile_result.returncode == 0:
+                    run_result = subprocess.run([exe_file], capture_output=True, text=True)
+                    output = run_result.stdout + run_result.stderr
+                else:
+                    output = "Compilation Error:\n" + compile_result.stderr
+
+        elif lang == "cs":
+            if not check_runner("C# Compiler (csc)", ["csc"],
+                              "Install .NET SDK: https://dotnet.microsoft.com"):
+                return
+            with tempfile.NamedTemporaryFile("w", suffix=".cs", delete=False) as f:
+                f.write(code)
+                f.flush()
+                exe_file = f.name.replace(".cs", ".exe")
+                compile_result = subprocess.run(
+                    ["csc", f.name],
+                    capture_output=True,
+                    text=True
+                )
+                if compile_result.returncode == 0:
+                    run_result = subprocess.run([exe_file], capture_output=True, text=True)
+                    output = run_result.stdout + run_result.stderr
+                else:
+                    output = "Compilation Error:\n" + compile_result.stderr
+
+        elif lang == "html":
+            import webbrowser
+            with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+                f.write(code)
+                f.flush()
+                webbrowser.open(f.name)
+            output = "Opened in default browser."
+
+        else:
+            output = "Language not supported for execution."
+
+    except subprocess.CalledProcessError as e:
+        output = f"Process Error ({e.returncode}):\n{e.stderr}"
+    except Exception as e:
+        output = f"Unexpected Error: {str(e)}"
+    finally:
+        if 'f' in locals() and hasattr(f, 'name'):
+            try:
+                os.unlink(f.name)
+                if lang in ("cpp", "cs"):
+                    os.unlink(exe_file)
+            except Exception as e:
+                show_error(f"Cleanup failed: {str(e)}")
+
+    output_text.insert("1.0", output)
+    output_text.see(tk.END)
+  
+sidebar_visible = [True]  
+def show_sidebar():
+    sidebar.pack(side=tk.LEFT, fill=tk.Y)
+    sidebar_visible[0] = True
+    
+def hide_sidebar():
+    sidebar.pack_forget()
+    sidebar_visible[0] = False
 
 def update_line_numbers(event=None):
     if text.edit_modified():
@@ -1164,7 +1491,7 @@ def on_key_release(event=None):
     else:
         highlight_job = root.after(debounce_delay, highlight_line)
     update_line_numbers()
-
+                
 text.unbind("<KeyRelease>")
 text.bind('<KeyRelease>', on_key_release)
 text.bind('<Configure>', update_line_numbers)
@@ -1173,8 +1500,12 @@ text.bind('<Return>', auto_indent)
 text.bind('<BackSpace>', update_line_numbers)
 text.bind("<Control-o>", open_file)
 text.bind("<Control-s>", save_file)
+text.bind("<Control-D>", open_folder)
 text.bind("<Control-z>", undo_action)
 text.bind("<Control-y>", redo_action)
+text.bind("<Control-j>", show_sidebar)
+text.bind("<Control-l>", hide_sidebar)
+text.bind("<Control-r>", run_code)
 text.bind("<Control-f>", find_text)
 text.bind("<Control-n>", new_file)
 root.bind("<Control-minus>", zoom_out)
@@ -1191,6 +1522,7 @@ file_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="New", command=new_file, accelerator="Ctrl+N")
 file_menu.add_command(label="Open", command=open_file, accelerator="Ctrl+O")
+open_folder_btn = file_menu.add_command(label="Open Folder", command=open_folder, accelerator="Ctrl+Shift+D")
 file_menu.add_command(label="Save", command=save_file, accelerator="Ctrl+S")
 file_menu.add_separator()
 file_menu.add_command(label="Exit", command=root.quit)
@@ -1207,11 +1539,22 @@ theme_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="Theme", menu=theme_menu)
 theme_menu.add_command(label="Light", command=lambda: set_theme('light'))
 theme_menu.add_command(label="Dark", command=lambda: set_theme('dark'))
+theme_menu.add_command(label="Dracula", command=lambda: set_theme('dracula'))
+theme_menu.add_command(label="Monokai", command=lambda: set_theme('monokai'))
+theme_menu.add_command(label="Night Owl", command=lambda: set_theme('night_owl'))
+theme_menu.add_command(label="Shades Of Purple", command=lambda: set_theme('shades_of_purple'))
 
 view_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="View", menu=view_menu)
 view_menu.add_command(label="Zoom In", command=zoom_in, accelerator="Ctrl++")
 view_menu.add_command(label="Zoom Out", command=zoom_out, accelerator="Ctrl+-")
+view_menu.add_separator()
+view_menu.add_command(label="Show Sidebar", command=show_sidebar, accelerator="Ctrl+J")
+view_menu.add_command(label="Hide Sidebar", command=hide_sidebar, accelerator="Ctrl+L")
+
+run_menu = tk.Menu(menu, tearoff=0)
+menu.add_cascade(label="Run", menu=run_menu)
+run_menu.add_command(label="Run File", command=run_code, accelerator="Ctrl+R")
 
 language_var = tk.StringVar(value='plaintext')
 language_menu = tk.Menu(menu, tearoff=0)
