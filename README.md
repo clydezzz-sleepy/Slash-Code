@@ -10,5 +10,4 @@
 ![How it will look like in a C++ script.](cpp.png)
 ![A second example of how it will look like in a C++ script.](cpp_2.png)
 ![How it will look like in a CSS script.](css.png)
-![How it will look like in a C++ script.](cpp.png)
 
