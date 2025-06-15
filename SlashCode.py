@@ -11,6 +11,7 @@ import tempfile
 import sys
 import platform
 from tkinter import filedialog, scrolledtext, messagebox, ttk
+current_file = ""
 
 root = tk.Tk()
 if os.name == "nt" and sys.executable != "":
@@ -49,7 +50,7 @@ class ToolTip:
         if self.tooltip_window:
             self.tooltip_window.destroy()
             self.tooltip_window = None
-
+        
 tooltip_manager = ToolTip()
 
 
@@ -489,7 +490,79 @@ TOOLTIP_INFO = {
             'Sort': 'Sorts the elements in the collection.',
             'Reverse': 'Reverses the order of the elements in the collection.',
         }
+    },
+    'css': {
+        'keywords': {
+            '@import': 'Imports an external stylesheet into the current file.',
+            '@media': 'Defines media queries for responsive design.',
+            '@font-face': 'Allows custom fonts to be loaded.',
+            '@keyframes': 'Defines CSS animations.',
+            '@supports': 'Checks if the browser supports a CSS feature.',
+            '@charset': 'Specifies the character encoding of the stylesheet.',
+            '@namespace': 'Declares an XML namespace.',
+            'color': 'Sets the text color of an element.',
+            'background': 'Sets all background style properties at once.',
+            'background-color': 'Specifies the background color of an element.',
+            'font-family': 'Specifies the font for an element.',
+            'font-size': 'Specifies the size of the font.',
+            'font-weight': 'Specifies the weight (boldness) of the font.',
+            'margin': 'Sets the outer margin of an element.',
+            'padding': 'Sets the inner padding of an element.',
+            'border': 'Sets the border properties of an element.',
+            'width': 'Sets the width of an element.',
+            'height': 'Sets the height of an element.',
+            'display': 'Specifies how an element is displayed (block, inline, etc).',
+            'position': 'Specifies the positioning method (static, relative, absolute, fixed, sticky).',
+            'top': 'Specifies the top position of a positioned element.',
+            'left': 'Specifies the left position of a positioned element.',
+            'right': 'Specifies the right position of a positioned element.',
+            'bottom': 'Specifies the bottom position of a positioned element.',
+            'z-index': 'Sets the stack order of a positioned element.',
+            'overflow': 'Specifies what happens if content overflows an element\'s box.',
+            'opacity': 'Sets the transparency level of an element.',
+            'cursor': 'Specifies the type of mouse cursor to be displayed.',
+            'box-shadow': 'Attaches one or more shadows to an element.',
+            'text-align': 'Specifies the horizontal alignment of text.',
+            'vertical-align': 'Specifies the vertical alignment of an inline or table-cell box.',
+            'float': 'Specifies whether or not an element should float.',
+            'clear': 'Specifies what elements can float beside the cleared element and on which side.',
+            'transition': 'Defines the transition between two states of an element.',
+            'transform': 'Applies a 2D or 3D transformation to an element.',
+            'animation': 'A shorthand property for all animation properties.',
+            'visibility': 'Specifies whether an element is visible or hidden.',
+            'background-image': 'Sets one or more background images for an element.',
+            'background-size': 'Specifies the size of the background images.',
+            'background-position': 'Specifies the starting position of a background image.',
+            'background-repeat': 'Sets if/how a background image will be repeated.',
+            'border-radius': 'Defines the radius of the element\'s corners.',
+            'min-width': 'Sets the minimum width of an element.',
+            'max-width': 'Sets the maximum width of an element.',
+            'min-height': 'Sets the minimum height of an element.',
+            'max-height': 'Sets the maximum height of an element.',
+            'content': 'Used with ::before and ::after to insert generated content.',
+            'outline': 'Sets the outline on elements.',
+            'list-style': 'Sets all the properties for a list in one declaration.',
+            'pointer-events': 'Defines whether or not an element reacts to pointer events.',
+            'filter': 'Applies graphical effects like blur or color shift to an element.',
+            'object-fit': 'Specifies how the content of a replaced element should be resized to fit its container.',
+            'user-select': 'Controls the user\'s ability to select text.'
+    },
+        'functions': {
+            'rgb': 'Defines a color using the Red-Green-Blue model. Example: rgb(255, 0, 0) for red.',
+            'rgba': 'Defines a color using Red-Green-Blue-Alpha (opacity). Example: rgba(255, 0, 0, 0.5).',
+            'url': 'Specifies a URL for loading external resources (images, fonts, etc).',
+            'calc': 'Performs calculations to determine CSS property values.',
+            'var': 'Used to insert the value of a custom property (CSS variable).',
+            'hsl': 'Defines a color using the Hue-Saturation-Lightness model.',
+            'hsla': 'Defines a color using Hue-Saturation-Lightness-Alpha (opacity).',
+            'min': 'Returns the smallest (minimum) value from a list of comma-separated expressions.',
+            'max': 'Returns the largest (maximum) value from a list of comma-separated expressions.',
+            'clamp': 'Clamps a value between an upper and lower bound.',
+            'TranslateY': 'Used for transforms to move a certain object an amount of pixels into the y-axis.',
+            'TranslateX': 'Used for transforms to move a certain object an amount of pixels into the x-axis.',
+            'Translate': 'Used for moving a certain object into both the x- and y-axis. This function has two parameters: x and y.'
     }
+  }
 }
 
 def new_file(event=None):
@@ -546,6 +619,9 @@ def save_file(event=None):
     elif language == "javascript":
         ext = ".js"
         filetypes = [("JavaScript files", "*.js"), ("All files", "*.*")]
+    elif language == "css":
+        ext = ".css"
+        filetypes = [("CSS files", "*.css"), ("All files", "*.*")]
     elif language == "html":
         ext = ".html"
         filetypes = [("HTML files", "*.html"), ("All files", "*.*")]
@@ -579,6 +655,8 @@ def get_language(file_path):
         return 'cpp'
     elif file_path.endswith('.cs'):
         return 'cs'
+    elif file_path.endswith('.css'):
+        return 'css'
     else:
         return 'plaintext'
     
@@ -599,7 +677,9 @@ def guess_language_from_content(content):
     if any(keyword in content for keyword in ('def ', 'import ', 'from ', 'class ', 'assert ')):
         return 'python'
     if any(keyword in content for keyword in ('function(', 'console.log', 'const ', 'let ', 'var ')):
-        return 'javascript'    
+        return 'javascript'  
+    if any(keyword in content for keyword in ('{', '}', ';', ':', 'color', 'background', 'font', 'margin', 'padding')) and content.strip().endswith('}'):
+        return 'css'  
     return 'plaintext'
 
 def highlight_line(event=None):
@@ -655,14 +735,8 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
     string_spans = []
     preproc_spans = []
 
-    def is_in_comment(idx):
-        return any(s <= idx < e for s, e in comment_spans)
-
     def is_in_string_or_comment(idx):
         return any(s <= idx < e for s, e in comment_spans + string_spans)
-
-    def is_in_preproc(idx):
-        return any(s <= idx < e for s, e in preproc_spans)
     
     def is_in_string(idx):
         return any(s <= idx < e for s, e in string_spans)
@@ -684,7 +758,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                     text.tag_add("comment", f"{region_start}+{comment_start}c", f"{region_start}+{comment_end}c")
             current_pos += len(line) + 1
 
-    elif language in ("javascript", "cpp", "cs"):
+    elif language in ("javascript", "cpp", "cs", "css"):
         for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', content):
             s, e = match.start(), match.end()
             string_spans.append((s, e))
@@ -711,6 +785,52 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
 
     masked_content = mask_comments(content, comment_spans)
 
+    if language == "css":
+        # --- Strings ---
+        for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', masked_content):
+            s, e = match.start(), match.end()
+            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- At-Rules (e.g. @font-face) ---
+        for match in re.finditer(r'@[a-zA-Z_-]+', masked_content):
+            s, e = match.start(), match.end()
+            text.tag_add("preprocessor", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            
+        # --- General Keywords ---
+        css_keywords = {'none', 'auto', 'inherit', 'initial', 'unset', 'transparent', 'block', 'inline', 'flex', 'grid', 'center', 'normal'}
+        for keyword in css_keywords:
+            for match in re.finditer(rf'\b{re.escape(keyword)}\b', masked_content):
+                s, e = match.start(), match.end()
+                if not is_in_string_or_comment(s):
+                    text.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Selectors (before '{') ---
+        for match in re.finditer(r'([^{}/][^{}/]*)\s*\{', masked_content):
+            selector = match.group(1)
+            s = match.start(1)
+            e = match.end(1)
+            text.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Properties ---
+        for match in re.finditer(r'([a-zA-Z-]+)\s*:', masked_content):
+            s, e = match.start(1), match.end(1)
+            text.tag_add("function", f"{region_start}+{s}c", f"{region_start}+{e}c")
+ 
+        # --- Function Calls (e.g. url(), rgb(), clamp()) ---
+        for match in re.finditer(r'(\b[a-zA-Z-]+)\s*\(', masked_content):
+            s, e = match.start(1), match.end(1)
+            text.tag_add("builtin", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Numbers/Units ---
+        for match in re.finditer(r'(-?\d*\.?\d+)(px|em|rem|%|vh|vw|vmin|vmax|ex|ch|pt|cm|mm|in|Q|s|ms)?\b', masked_content):
+            s, e = match.start(), match.end()
+            text.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Hex Colors ---
+        for match in re.finditer(r'#[0-9a-fA-F]{3,6}\b', masked_content):
+            s, e = match.start(), match.end()
+            text.tag_add("constant", f"{region_start}+{s}c", f"{region_start}+{e}c")
+           
     # --- Strings ---
     for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', masked_content):
         s, e = match.start(), match.end()
@@ -725,7 +845,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 text.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
 
     # --- Operators ---       
-    if language in ("cpp", "python", "javascript", "cs"):
+    if language in ("cpp", "python", "javascript", "cs", "css"):
         operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
         for match in re.finditer(operator_pattern, content):
             s, e = match.start(), match.end()
@@ -740,7 +860,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 if not is_in_string_or_comment(match.start()):
                     text.tag_add("builtin", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
             
-    # --- Semicolons (C++, JavaScript) ---
+    # --- Semicolons (C++, C#, CSS, JavaScript) ---
     for match in re.finditer(r';', content):
         s, e = match.start(), match.end()
         if not is_in_string_or_comment(s):
@@ -947,13 +1067,13 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
 
 themes = {
     'light': {
-        'bg': '#ffffff', 'fg': '#000000',
-        'keyword': '#0000ff', 'string': "#bf6900", 'comment': '#008000',
-        'function': '#800080', 'funccall': '#00008b', 'integer': '#ffa500', 'member': '#7a1c15',
-        'prefix': '#006400', 'line_numbers': '#f0f0f0', 'cursor': '#000000', 'type': "#0e3c8a",
-        'variable': '#000000', 'builtin': "#003a78", 'dunder': '#4F4F4F', 'pointer': "#2c3bc5", 'classname': "#e99235",
-        'escape': '#404040', 'semicolon': "#4b4b4b", 'preprocessor': "#681968", 'preprocessor_rest': "#343434",
-        'html_tag': "#68177B", 'html_attr': "#074a7c", 'constant': "#d86919", 'template': "#083e3f", 'operator': "#237471",
+    'bg': '#ffffff', 'fg': '#000000',
+    'keyword': '#005cc5', 'string': "#d73a49", 'comment': '#6a737d',
+    'function': '#6f42c1', 'funccall': '#005cc5', 'integer': '#22863a', 'member': '#e36209',
+    'prefix': '#22863a', 'line_numbers': '#f0f0f0', 'cursor': '#000000', 'type': "#6f42c1",
+    'variable': '#24292e', 'builtin': "#e36209", 'dunder': '#6a737d', 'pointer': "#005cc5", 'classname': "#6f42c1",
+    'escape': '#24292e', 'semicolon': "#586069", 'preprocessor': "#d73a49", 'preprocessor_rest': "#586069",
+    'html_tag': "#22863a", 'html_attr': "#6f42c1", 'constant': "#005cc5", 'template': "#22863a", 'operator': "#d73a49",
     },
     'dark': {
         'bg': '#1e1e1e', 'fg': '#d4d4d4',
@@ -1158,22 +1278,32 @@ def on_tree_double_click(event=None):
     path = get_full_path(node)
     if os.path.isfile(path):
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                text.delete("1.0", tk.END)
-                text.insert("1.0", f.read())
-            highlight_full_document()
+            with open(path, 'r', encoding='utf-8') as f:
+                code = f.read()
+                text.delete(1.0, tk.END)
+                text.insert(tk.END, code)
+                root.title(f"Slash Code - {os.path.basename(path)}")
+                lang = get_language(path)
+                if lang == 'plaintext':
+                    lang = guess_language_from_content(code)
+                language_var.set(lang)
+                globals()['current_file'] = path
+                update_line_numbers()
+                highlight_full_document()
         except Exception as e:
             messagebox.showerror("Error", f"Could not open file:\n{e}")
-
+        
 tree.bind("<Double-1>", on_tree_double_click)
 
-def open_folder():
-    folder = filedialog.askdirectory()
+def open_folder(folder=None, skip_ask=False):
+    if not folder and not skip_ask:
+        folder = filedialog.askdirectory()
     if folder:
         tree.delete(*tree.get_children())
         root_node = tree.insert("", "end", text=folder, open=True)
         insert_nodes(root_node, folder)
         file_listbox.folder_path = folder
+        globals()['FOLDER'] = folder
 
 def on_open_node(event):
     node = tree.focus()
@@ -1566,6 +1696,7 @@ def highlight_language_change():
 language_menu.add_radiobutton(label="Plain Text", variable=language_var, value='plaintext', command=highlight_language_change)
 language_menu.add_radiobutton(label="Python", variable=language_var, value='python', command=highlight_language_change)
 language_menu.add_radiobutton(label="JavaScript", variable=language_var, value='javascript', command=highlight_language_change)
+language_menu.add_radiobutton(label="CSS", variable=language_var, value='css', command=highlight_language_change)
 language_menu.add_radiobutton(label="HTML", variable=language_var, value='html', command=highlight_language_change)
 language_menu.add_radiobutton(label="C++", variable=language_var, value='cpp', command=highlight_language_change)
 language_menu.add_radiobutton(label="C#", variable=language_var, value='cs', command=highlight_language_change)
@@ -1576,6 +1707,7 @@ def save_session():
     config_file = os.path.join(config_dir, 'session.json')
     session = {
         'file': current_file if os.path.exists(current_file) else "",
+        'directory': globals()['FOLDER'] if globals()['FOLDER'] != "" else "",
         'theme': current_theme,
         'language': language_var.get()
     }
@@ -1609,6 +1741,12 @@ if session.get('file'):
             current_file = session['file']
     except Exception as e:
         print(f"Error loading file: {e}")
+        
+if session.get('directory'):
+    try:
+        open_folder(session['directory'], True)
+    except Exception as e:
+        print(f"Error loading directory: {e}")
 
 if session.get('theme'):
     set_theme(session['theme'])
@@ -1617,5 +1755,20 @@ else:
 if session.get('language'):
     language_var.set(session['language'])
 highlight_full_document()
+
+if len(sys.argv) > 1:
+    file_to_open = os.path.abspath(sys.argv[1])
+    if os.path.isfile(file_to_open):
+        try:
+            with open(file_to_open, "r", encoding="utf-8") as f:
+                text.delete("1.0", tk.END)
+                text.insert("1.0", f.read())
+            root.title(f"Slash Code - {os.path.basename(file_to_open)}")
+            current_file = file_to_open
+            highlight_full_document()
+            save_session()
+            load_session()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open file:\n{e}")
 
 root.mainloop()
