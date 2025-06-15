@@ -5,3 +5,7 @@
 # This text editor offers a small variety of languages to pick from (resulting in syntax highlighting for different keywords), fully functional syntax highlighting, session saving (if a previous session is present), the ability to run your files directly through the text editor, a sidebar with clear folder trees to help you navigate through directories easily (and access files inside of those directories), tooltips to help you understand what the specific keyword or function does, two different themes to choose from (6 different themes, also resulting in different syntax highlighting) and basic tools you can use, like finding a piece of text in a file or zooming in and out for whatever fits your eyes the best.
 * While it may not seem much, it basically has what you physically need! It's a low-resource text editor that doesn't have features on every corner of your eyes. Nice on your eyes!
 - Have fun!
+
+![How it will look like in a Python script.](images/python.png)
+![How it will look like in a C++ script.](images/cpp.png)
+
