@@ -584,7 +584,8 @@ def open_file(event=None):
     ("Header files", "*.h"),
     ("Text files", "*.txt"),
     ("C# files", "*.cs"),
-    ("All files", "*.py *.js *.html *.c *.cpp *.hpp *.h *.cs *.txt"),
+    ("CSS files", "*.css"),
+    ("All files", "*.py *.js *.html *.c *.cpp *.hpp *.h *.cs *.txt *.css"),
     ]
     file = filedialog.askopenfilename(filetypes=filetypes)
     if file:
