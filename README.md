@@ -6,6 +6,6 @@
 * While it may not seem much, it basically has what you physically need! It's a low-resource text editor that doesn't have features on every corner of your eyes. Nice on your eyes!
 - Have fun!
 
-![How it will look like in a Python script.](images/python.png)
-![How it will look like in a C++ script.](images/cpp.png)
+![How it will look like in a Python script.](python.png)
+![How it will look like in a C++ script.](cpp.png)
 
