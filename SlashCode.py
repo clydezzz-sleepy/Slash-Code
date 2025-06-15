@@ -12,6 +12,7 @@ import sys
 import platform
 from tkinter import filedialog, scrolledtext, messagebox, ttk
 current_file = ""
+FOLDER = ""
 
 root = tk.Tk()
 if os.name == "nt" and sys.executable != "":
@@ -592,6 +593,7 @@ def open_file(event=None):
             code = f.read()
             text.delete(1.0, tk.END)
             text.insert(tk.END, code)
+            text.edit_separator()
             root.title(f"Slash Code - {os.path.basename(file)}")
             lang = get_language(file)
             if lang == 'plaintext':
@@ -1302,6 +1304,7 @@ def open_folder(folder=None, skip_ask=False):
         tree.delete(*tree.get_children())
         root_node = tree.insert("", "end", text=folder, open=True)
         insert_nodes(root_node, folder)
+        new_file()
         file_listbox.folder_path = folder
         globals()['FOLDER'] = folder
 
@@ -1755,6 +1758,7 @@ else:
 if session.get('language'):
     language_var.set(session['language'])
 highlight_full_document()
+
 
 if len(sys.argv) > 1:
     file_to_open = os.path.abspath(sys.argv[1])
