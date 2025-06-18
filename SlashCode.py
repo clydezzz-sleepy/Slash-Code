@@ -10,9 +10,10 @@ import subprocess
 import tempfile
 import sys
 import platform
-from tkinter import filedialog, scrolledtext, messagebox, ttk
+from tkinter import filedialog, scrolledtext, messagebox, ttk, font
 current_file = ""
 FOLDER = ""
+open_folder_btn = None
 
 root = tk.Tk()
 if os.name == "nt" and sys.executable != "":
@@ -28,7 +29,325 @@ else:
         pass
 root.title("Slash Code")
 
+language_var = tk.StringVar(value='plaintext')
+GUILANGS = {
+    "en": {
+    "gui_lang": "GUI Language",
+    "msys_install": "MSYS2 installed. Please install MinGW via MSYS2 shell: pacman -S mingw-w64-x86_64-gcc",
+    "error_a1": "Error",
+    "error_a2": "Could not open file",
+    "error_a3": "Could not open file:\n",
+    "find": "Find",
+    "find_query": "Find:",
+    "runner_not_found": " not found!\n",
+    "install_suggest": "Please install it first.\n",
+    "instructions": "Instructions: ",
+    "compilation_error": "Compilation Error:\n",
+    "opened_in_browser": "Opened in default browser.",
+    "language_not_supported": "Language not supported for execution.",
+    "process_error": "Process Error ",
+    "unexpected_error": "Unexpected Error: ",
+    "cleanup_failed": "Cleanup failed: ",
+    "file": "File",
+    "new": "New",
+    "open": "Open",
+    "save": "Save",
+    "exit": "Exit",
+    "edit": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "language": "Language",
+    "theme": "Theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_dracula": "Dracula",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "Night Owl",
+    "theme_shades_of_purple": "Shades Of Purple",
+    "open_folder": "Open Folder",
+    "changed_language_to": "Changed language to ",
+    "view": "View",
+    "zoom_in": "Zoom In",
+    "zoom_out": "Zoom Out",
+    "show_sidebar": "Show Sidebar",
+    "hide_sidebar": "Hide Sidebar",
+    "run": "Run",
+    "run_file": "Run File",
+    "highlighting_as": "Highlighting as: ",
+    "plaintext": "Plain Text",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "error_b1": "Error loading file: ",
+    "error_b2": "Error loading directory: "
+    },
+    
+    "nl": {
+    "gui_lang": "GUI Taal",
+    "msys_install": "MSYS2 is geinstalleerd. Installeer alstublieft MinGW via de MSYS2 shell: pacman -S mingw-w64-x86_64-gcc",
+    "error_a1": "Fout",
+    "error_a2": "Kon niet bestand openen",
+    "error_a3": "Kon niet bestand openen:\n",
+    "find": "Vind",
+    "find_query": "Vind:",
+    "runner_not_found": " niet gevonden!\n",
+    "install_suggest": "Installeer het alstublieft eerst.\n",
+    "instructions": "Instructies: ",
+    "compilation_error": "Compilatie fout:\n",
+    "opened_in_browser": "Geopend in de standaard browser.",
+    "language_not_supported": "Taal niet gesteund voor executie.",
+    "process_error": "Proces fout ",
+    "unexpected_error": "Onverwachte fout: ",
+    "cleanup_failed": "Schoonmaking gefaald: ",
+    "file": "Bestand",
+    "new": "Nieuw",
+    "open": "Open",
+    "save": "Opslaan",
+    "exit": "Verlaten",
+    "edit": "Bewerken",
+    "undo": "Ongedaan Maken",
+    "redo": "Opnieuw Doen",
+    "language": "Taal",
+    "theme": "Thema",
+    "theme_light": "Licht",
+    "theme_dark": "Donker",
+    "theme_dracula": "Dracula",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "Nacht Uil",
+    "theme_shades_of_purple": "Tinten Van Paars",
+    "open_folder": "Open Map",
+    "changed_language_to": "Taal veranderd naar ",
+    "view": "Kijken",
+    "zoom_in": "Inzoomen",
+    "zoom_out": "Uitzoomen",
+    "show_sidebar": "Maak Zijbalk Zichtbaar",
+    "hide_sidebar": "Maak Zijbalk Onzichtbaar",
+    "run": "Uitvoeren",
+    "run_file": "Bestand Uitvoeren",
+    "highlighting_as": "Wordt gemarkeerd als: ",
+    "plaintext": "Platte Text",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "error_b1": "Fout gedurend bestand laden: ",
+    "error_b2": "Fout gedurend map laden: "
+    },
+    "es": {
+    "gui_lang": "GUI Lenguaje",
+    "msys_install": "MSYS2 instalado. Por favor instala MinGW desde la terminal de MSYS2: pacman -S mingw-w64-x86_64-gcc",
+    "error_a1": "Error",
+    "error_a2": "No se pudo abrir el archivo",
+    "error_a3": "No se pudo abrir el archivo:\n",
+    "find": "Buscar",
+    "find_query": "Buscar:",
+    "runner_not_found": " no encontrado!\n",
+    "install_suggest": "Por favor instálalo primero.\n",
+    "instructions": "Instrucciones: ",
+    "compilation_error": "Error de compilación:\n",
+    "opened_in_browser": "Abierto en el navegador predeterminado.",
+    "language_not_supported": "Idioma no compatible para ejecución.",
+    "process_error": "Error del proceso ",
+    "unexpected_error": "Error inesperado: ",
+    "cleanup_failed": "Fallo al limpiar: ",
+    "file": "Archivo",
+    "new": "Nuevo",
+    "open": "Abrir",
+    "save": "Guardar",
+    "exit": "Salir",
+    "edit": "Editar",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "language": "Lenguaje",
+    "theme": "Tema",
+    "theme_light": "Claro",
+    "theme_dark": "Oscuro",
+    "theme_dracula": "Drácula",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "Búho Nocturno",
+    "theme_shades_of_purple": "Tonos de Púrpura",
+    "open_folder": "Abrir Carpeta",
+    "changed_language_to": "Cambió de idioma a ",
+    "view": "Vista",
+    "zoom_in": "Acercar",
+    "zoom_out": "Alejar",
+    "show_sidebar": "Mostrar barra lateral",
+    "hide_sidebar": "Ocultar barra lateral",
+    "run": "Ejecutar",
+    "run_file": "Ejecutar archivo",
+    "highlighting_as": "Resaltado como: ",
+    "plaintext": "Texto plano",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "error_b1": "Error al cargar el archivo: ",
+    "error_b2": "Error al cargar el directorio: "
+    },
+    
+    "fr": {
+    "gui_lang": "Langue de l'interface",
+    "msys_install": "MSYS2 est installé. Veuillez installer MinGW via le terminal MSYS2 : pacman -S mingw-w64-x86_64-gcc",
+    "error_a1": "Erreur",
+    "error_a2": "Impossible d'ouvrir le fichier",
+    "error_a3": "Impossible d'ouvrir le fichier:\n",
+    "find": "Rechercher",
+    "find_query": "Rechercher:",
+    "runner_not_found": " introuvable!\n",
+    "install_suggest": "Veuillez l'installer d'abord.\n",
+    "instructions": "Instructions: ",
+    "compilation_error": "Erreur de compilation:\n",
+    "opened_in_browser": "Ouvert dans le navigateur par défaut.",
+    "language_not_supported": "Langue non prise en charge pour l'exécution.",
+    "process_error": "Erreur de processus ",
+    "unexpected_error": "Erreur inattendue: ",
+    "cleanup_failed": "Échec du nettoyage: ",
+    "file": "Fichier",
+    "new": "Nouveau",
+    "open": "Ouvrir",
+    "save": "Enregistrer",
+    "exit": "Quitter",
+    "edit": "Éditer",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "language": "Langue",
+    "theme": "Thème",
+    "theme_light": "Clair",
+    "theme_dark": "Sombre",
+    "theme_dracula": "Dracula",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "Chouette Nocturne",
+    "theme_shades_of_purple": "Nuances de Violet",
+    "open_folder": "Ouvrir le dossier",
+    "changed_language_to": "Langue changée en ",
+    "view": "Affichage",
+    "zoom_in": "Agrandir",
+    "zoom_out": "Rétrécir",
+    "show_sidebar": "Afficher la barre latérale",
+    "hide_sidebar": "Masquer la barre latérale",
+    "run": "Exécuter",
+    "run_file": "Exécuter le fichier",
+    "highlighting_as": "Surlignage comme: ",
+    "plaintext": "Texte brut",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "error_b1": "Erreur lors du chargement du fichier: ",
+    "error_b2": "Erreur lors du chargement du dossier: "
+    },
+    
+    "jp": {
+    "gui_lang": "GUI 言語",
+    "msys_install": "MSYS2がインストールされました。MSYS2シェルでMinGWをインストールしてください: pacman -S mingw-w64-x86_64-gcc",
+    "error_a1": "エラー",
+    "error_a2": "ファイルを開けませんでした",
+    "error_a3": "ファイルを開けませんでした:\n",
+    "find": "検索",
+    "find_query": "検索：",
+    "runner_not_found": " が見つかりません！\n",
+    "install_suggest": "まずインストールしてください。\n",
+    "instructions": "使い方：",
+    "compilation_error": "コンパイルエラー：\n",
+    "opened_in_browser": "デフォルトのブラウザで開きました。",
+    "language_not_supported": "この言語は実行に対応していません。",
+    "process_error": "プロセスエラー ",
+    "unexpected_error": "予期しないエラー：",
+    "cleanup_failed": "クリーンアップに失敗しました：",
+    "file": "ファイル",
+    "new": "新規",
+    "open": "開く",
+    "save": "保存",
+    "exit": "終了",
+    "edit": "編集",
+    "undo": "元に戻す",
+    "redo": "やり直し",
+    "language": "言語",
+    "theme": "テーマ",
+    "theme_light": "ライト",
+    "theme_dark": "ダーク",
+    "theme_dracula": "ドラキュラ",
+    "theme_monokai": "モノカイ",
+    "theme_night_owl": "ナイトアウル",
+    "theme_shades_of_purple": "紫の影",
+    "open_folder": "フォルダーを開く",
+    "changed_language_to": "言語", # Japanese puts the topic in the middle, not the end, so we'll have to put the verb part to tbe end.
+    "view": "表示",
+    "zoom_in": "ズームイン",
+    "zoom_out": "ズームアウト",
+    "show_sidebar": "サイドバーを表示",
+    "hide_sidebar": "サイドバーを非表示",
+    "run": "実行",
+    "run_file": "ファイルを実行",
+    "highlighting_as": "ハイライト：",
+    "plaintext": "プレーンテキスト",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "error_b1": "ファイルの読み込みエラー：",
+    "error_b2": "ディレクトリの読み込みエラー："
+}
+}
+
+class GUITranslate:
+    def __init__(self, lang="en"):
+        self.lang = lang
+        self.load_lang()
+        
+    def load_lang(self):
+        slash_dir = os.path.expanduser('~/.slashcode')
+        os.makedirs(os.path.join(slash_dir, "lang"), exist_ok=True)
+        lang_file = os.path.join(slash_dir, f'lang/{self.lang}.json')
+        if os.path.exists(lang_file):
+            try:
+                with open(lang_file, 'r', encoding="utf-8") as f:
+                    self.data = json.load(f)
+                    return
+            except Exception:
+                pass
+        self.data = GUILANGS.get(self.lang, {})
+                
+    def get(self, key):
+        return self.data.get(key, key)
+    
+    def set_language(self, lang):
+        self.lang = lang
+        self.load_lang()
+        
+translate = GUITranslate()
+lang_var = tk.StringVar(value=translate.lang)
+
+menu = tk.Menu(root)
+root.config(menu=menu)
+file_menu = tk.Menu(menu, tearoff=0)
+edit_menu = tk.Menu(menu, tearoff=0)
+theme_menu = tk.Menu(menu, tearoff=0)
+view_menu = tk.Menu(menu, tearoff=0)
+run_menu = tk.Menu(menu, tearoff=0)
+language_menu = tk.Menu(menu, tearoff=0)
+guilang_menu = tk.Menu(menu, tearoff=0)
+file_index = edit_index = theme_index = view_index = run_index = language_index = guilang_index = None
+
+def highlight_language_change():
+    print(translate.get("highlighting_as") + f"{language_var.get()}")
+    root.after(10, highlight_full_document)
+
 class ToolTip:
+    """
+    Used for creating custom defined tooltips.
+    """
     def __init__(self):
         self.tooltip_window = None
     
@@ -54,6 +373,120 @@ class ToolTip:
         
 tooltip_manager = ToolTip()
 
+ui_count = 0
+def on_lang_change():
+    global ui_count
+    translate.set_language(lang_var.get())
+    lang_map = {
+        "en": "English",
+        "nl": "Nederlands",
+        "es": "Español",
+        "fr": "Français",
+        "jp": "日本語"
+    }
+    lang = lang_var.get()
+    lang_name = lang_map.get(lang, lang)
+    message = translate.get("changed_language_to") + lang_name
+
+    if lang == "jp":
+        message += "に変更されました"
+
+    print(message)
+    if ui_count == 0:
+        set_ui()
+        ui_count += 1
+    update_ui_text()
+
+def update_ui_text():
+    global open_folder_btn
+    global file_menu, edit_menu, theme_menu, view_menu, run_menu, language_menu, guilang_menu
+    global file_index, edit_index, theme_index, view_index, run_index, language_index, guilang_index
+    try:
+        menu.entryconfig(file_index, label=translate.get("file"))
+        menu.entryconfig(edit_index, label=translate.get("edit"))
+        menu.entryconfig(theme_index, label=translate.get("theme"))
+        menu.entryconfig(view_index, label=translate.get("view"))
+        menu.entryconfig(run_index, label=translate.get("run"))
+        menu.entryconfig(language_index, label=translate.get("language"))
+        menu.entryconfig(guilang_index, label=translate.get("gui_lang"))
+    except Exception as e:
+        print("Menu label update error:", e)
+
+    try:
+        file_menu.entryconfig(0, label=translate.get("new"))
+        file_menu.entryconfig(1, label=translate.get("open"))
+        file_menu.entryconfig(2, label=translate.get("open_folder"))
+        file_menu.entryconfig(3, label=translate.get("save"))
+        file_menu.entryconfig(5, label=translate.get("exit"))
+    except Exception as e:
+        print("File menu update error:", e)
+
+    try:
+        edit_menu.entryconfig(0, label=translate.get("undo"))
+        edit_menu.entryconfig(1, label=translate.get("redo"))
+        edit_menu.entryconfig(3, label=translate.get("find"))
+    except Exception as e:
+        print("Edit menu update error:", e)
+
+    try:
+        theme_menu.entryconfig(0, label=translate.get("theme_light"))
+        theme_menu.entryconfig(1, label=translate.get("theme_dark"))
+        theme_menu.entryconfig(2, label=translate.get("theme_dracula"))
+        theme_menu.entryconfig(3, label=translate.get("theme_monokai"))
+        theme_menu.entryconfig(4, label=translate.get("theme_night_owl"))
+        theme_menu.entryconfig(5, label=translate.get("theme_shades_of_purple"))
+    except Exception as e:
+        print("Theme menu update error:", e)
+
+    try:
+        view_menu.entryconfig(0, label=translate.get("zoom_in"))
+        view_menu.entryconfig(1, label=translate.get("zoom_out"))
+        view_menu.entryconfig(3, label=translate.get("show_sidebar"))
+        view_menu.entryconfig(4, label=translate.get("hide_sidebar"))
+    except Exception as e:
+        print("View menu update error:", e)
+
+    try:
+        run_menu.entryconfig(0, label=translate.get("run_file"))
+    except Exception as e:
+        print("Run menu update error:", e)
+
+    try:
+        language_menu.entryconfig(0, label=translate.get("plaintext"))
+        language_menu.entryconfig(1, label=translate.get("python"))
+        language_menu.entryconfig(2, label=translate.get("javascript"))
+        language_menu.entryconfig(3, label=translate.get("css"))
+        language_menu.entryconfig(4, label=translate.get("html"))
+        language_menu.entryconfig(5, label=translate.get("cpp"))
+        language_menu.entryconfig(6, label=translate.get("cs"))
+    except Exception as e:
+        print("Language menu update error:", e)
+        
+    if open_folder_btn:
+        try:
+            open_folder_btn.config(text=translate.get("open_folder"))
+        except Exception as e:
+            print("Folder button update error: ", e)
+            
+    try:
+        guilang_menu.entryconfig(0, label="English")
+        guilang_menu.entryconfig(1, label="Nederlands")
+        guilang_menu.entryconfig(2, label="Español")
+        guilang_menu.entryconfig(3, label="Français")
+        guilang_menu.entryconfig(4, label="日本語")
+    except Exception as e:
+        print("GUI lang menu update error:", e)
+
+def create_sidebar_buttons():
+    global open_folder_btn
+    open_folder_btn = tk.Button(
+        sidebar,
+        text=translate.get("open_folder"),
+        command=open_folder,
+        bg=themes[theme_var.get()]['bg'],
+        fg=themes[theme_var.get()]['fg']
+    )
+    open_folder_btn.pack(fill=tk.X, pady=4)
 
 LANGUAGE_KEYWORDS = {
     'python': set(keyword.kwlist),
@@ -618,25 +1051,25 @@ def save_file(event=None):
 
     if language == "python":
         ext = ".py"
-        filetypes = [("Python files", "*.py"), ("All files", "*.*")]
+        filetypes = [(translate.get("python_files"), "*.py"), (translate.get("all_files"), "*.*")]
     elif language == "javascript":
         ext = ".js"
-        filetypes = [("JavaScript files", "*.js"), ("All files", "*.*")]
+        filetypes = [(translate.get("javascript_files"), "*.js"), (translate.get("all_files"), "*.*")]
     elif language == "css":
         ext = ".css"
-        filetypes = [("CSS files", "*.css"), ("All files", "*.*")]
+        filetypes = [(translate.get("css_files"), "*.css"), (translate.get("all_files"), "*.*")]
     elif language == "html":
         ext = ".html"
-        filetypes = [("HTML files", "*.html"), ("All files", "*.*")]
+        filetypes = [(translate.get("html_files"), "*.html"), (translate.get("all_files"), "*.*")]
     elif language == "cpp":
         ext = ".cpp"
-        filetypes = [("C++ files", "*.cpp"), ("All files", "*.*")]
+        filetypes = [(translate.get("cpp_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
     else:
         ext = ".txt"
-        filetypes = [("Text files", "*.txt"), ("All files", "*.*")]
+        filetypes = [(translate.get("text_files"), "*.txt"), (translate.get("all_files"), "*.*")]
 
     file = filedialog.asksaveasfilename(
-        title="Save As",
+        title=translate.get("save_as"),
         defaultextension=ext,
         initialfile=base_filename + ext,
         filetypes=filetypes
@@ -1177,7 +1610,10 @@ frame = tk.Frame(root)
 frame.pack(fill=tk.BOTH, expand=True)
 
 font_size = 12
-font = ("Consolas", font_size)
+if lang_var.get() == "jp":
+    font = ("NSJP.ttf", font_size)
+else:
+    font = ("Consolas", font_size)
 line_numbers = tk.Text(
     frame,
     font=font,
@@ -1248,10 +1684,10 @@ def open_selected_file(event=None):
             try:
                 with open(fpath, "r", encoding="utf-8") as f:
                     text.delete("1.0", tk.END)
-                    text.insert("1.0", f.read())
+                    text.insert(tk.END, f.read())
                 highlight_full_document()
             except Exception as e:
-                messagebox.showerror("Error", f"Could not open file:\n{e}")
+                messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
 
 file_listbox = tk.Listbox(sidebar, width=30, bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'], selectbackground=themes[theme_var.get()]['keyword'])
 file_listbox.bind("<<ListboxSelect>>", open_selected_file)
@@ -1294,7 +1730,7 @@ def on_tree_double_click(event=None):
                 update_line_numbers()
                 highlight_full_document()
         except Exception as e:
-            messagebox.showerror("Error", f"Could not open file:\n{e}")
+            messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
         
 tree.bind("<Double-1>", on_tree_double_click)
 
@@ -1320,14 +1756,8 @@ def on_open_node(event):
 
 tree.bind("<<TreeviewOpen>>", on_open_node)
 
-open_folder_btn = tk.Button(
-    sidebar,
-    text="Open Folder",
-    command=open_folder,
-    bg=themes[theme_var.get()]['bg'],
-    fg=themes[theme_var.get()]['fg']
-)
-open_folder_btn.pack(fill=tk.X, pady=4)
+create_sidebar_buttons()
+update_ui_text()
 
 def set_theme(theme_name):
     global current_theme
@@ -1404,8 +1834,8 @@ def find_text(event=None):
         text.tag_config('found', background='yellow', foreground='black')
 
     find_win = tk.Toplevel(root)
-    find_win.title("Find")
-    tk.Label(find_win, text="Find:").pack(side=tk.LEFT)
+    find_win.title(translate.get("find"))
+    tk.Label(find_win, text=translate.get("find_query")).pack(side=tk.LEFT)
     entry = tk.Entry(find_win)
     entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     tk.Button(find_win, text="Find All", command=do_find).pack(side=tk.LEFT)
@@ -1463,7 +1893,7 @@ def install_runner(lang):
                 pass
             try:
                 subprocess.run(["winget", "install", "-e", "--id", "MSYS2.MSYS2"], check=True, shell=True)
-                print("MSYS2 installed. Please install MinGW via MSYS2 shell: pacman -S mingw-w64-x86_64-gcc")
+                print(translate.get("msys_install"))
                 return False
             except Exception:
                 return False
@@ -1500,11 +1930,7 @@ def run_code():
             subprocess.run(check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return True
         except FileNotFoundError:
-            output_text.insert(tk.END, 
-                f"{runner_name} not found!\n"
-                f"Please install it first.\n"
-                f"Instructions: {install_instructions}\n"
-            )
+            output_text.insert(tk.END, runner_name + translate.get("runner_not_found") + f" Please install it first.\n" + translate.get("instructions") + f"{install_instructions}\n")
             return False
 
     try:
@@ -1565,7 +1991,7 @@ def run_code():
                     run_result = subprocess.run([exe_file], capture_output=True, text=True)
                     output = run_result.stdout + run_result.stderr
                 else:
-                    output = "Compilation Error:\n" + compile_result.stderr
+                    output = translate.get("compilation_error") + compile_result.stderr
 
         elif lang == "html":
             import webbrowser
@@ -1573,15 +1999,15 @@ def run_code():
                 f.write(code)
                 f.flush()
                 webbrowser.open(f.name)
-            output = "Opened in default browser."
+            output = translate.get("opened_in_browser")
 
         else:
-            output = "Language not supported for execution."
+            output = translate.get("language_not_supported")
 
     except subprocess.CalledProcessError as e:
-        output = f"Process Error ({e.returncode}):\n{e.stderr}"
+        output = translate.get("process_error") + f" ({e.returncode}):\n{e.stderr}"
     except Exception as e:
-        output = f"Unexpected Error: {str(e)}"
+        output = translate.get("unexpected_error") + f"{str(e)}"
     finally:
         if 'f' in locals() and hasattr(f, 'name'):
             try:
@@ -1589,11 +2015,11 @@ def run_code():
                 if lang in ("cpp", "cs"):
                     os.unlink(exe_file)
             except Exception as e:
-                show_error(f"Cleanup failed: {str(e)}")
+                show_error(translate.get("cleanup_failed") + f"{str(e)}")
 
     output_text.insert("1.0", output)
     output_text.see(tk.END)
-  
+
 sidebar_visible = [True]  
 def show_sidebar():
     sidebar.pack(side=tk.LEFT, fill=tk.Y)
@@ -1649,61 +2075,65 @@ root.bind("<Control-plus>", zoom_in)
 
 update_line_numbers()
 
-menu = tk.Menu(root)
-root.config(menu=menu)
+def set_ui():
+    global file_menu, edit_menu, theme_menu, view_menu, run_menu, language_menu, guilang_menu
+    global file_index, edit_index, theme_index, view_index, run_index, language_index, guilang_index
+    menu.delete(0, tk.END)
+    
+    menu.add_cascade(label=translate.get("file"), menu=file_menu)
+    file_index = menu.index(tk.END)
+    file_menu.add_command(label=translate.get("new"), command=new_file, accelerator="Ctrl+N")
+    file_menu.add_command(label=translate.get("open"), command=open_file, accelerator="Ctrl+O")
+    file_menu.add_command(label=translate.get("open_folder"), command=open_folder, accelerator="Ctrl+Shift+D")
+    file_menu.add_command(label=translate.get("save"), command=save_file, accelerator="Ctrl+S")
+    file_menu.add_separator()
+    file_menu.add_command(label=translate.get("exit"), command=root.quit)
 
-file_menu = tk.Menu(menu, tearoff=0)
-menu.add_cascade(label="File", menu=file_menu)
-file_menu.add_command(label="New", command=new_file, accelerator="Ctrl+N")
-file_menu.add_command(label="Open", command=open_file, accelerator="Ctrl+O")
-open_folder_btn = file_menu.add_command(label="Open Folder", command=open_folder, accelerator="Ctrl+Shift+D")
-file_menu.add_command(label="Save", command=save_file, accelerator="Ctrl+S")
-file_menu.add_separator()
-file_menu.add_command(label="Exit", command=root.quit)
+    menu.add_cascade(label=translate.get("edit"), menu=edit_menu)
+    edit_index = menu.index(tk.END)
+    edit_menu.add_command(label=translate.get("undo"), command=undo_action, accelerator="Ctrl+Z")
+    edit_menu.add_command(label=translate.get("redo"), command=redo_action, accelerator="Ctrl+Y")
+    edit_menu.add_separator()
+    edit_menu.add_command(label=translate.get("find"), command=find_text, accelerator="Ctrl+F")
 
-edit_menu = tk.Menu(menu, tearoff=0)
-menu.add_cascade(label="Edit", menu=edit_menu)
+    menu.add_cascade(label=translate.get("theme"), menu=theme_menu)
+    theme_index = menu.index(tk.END)
+    theme_menu.add_command(label=translate.get("theme_light"), command=lambda: set_theme('light'))
+    theme_menu.add_command(label=translate.get("theme_dark"), command=lambda: set_theme('dark'))
+    theme_menu.add_command(label=translate.get("theme_dracula"), command=lambda: set_theme('dracula'))
+    theme_menu.add_command(label=translate.get("theme_monokai"), command=lambda: set_theme('monokai'))
+    theme_menu.add_command(label=translate.get("theme_night_owl"), command=lambda: set_theme('night_owl'))
+    theme_menu.add_command(label=translate.get("theme_shades_of_purple"), command=lambda: set_theme('shades_of_purple'))
 
-edit_menu.add_command(label="Undo", command=undo_action, accelerator="Ctrl+Z")
-edit_menu.add_command(label="Redo", command=redo_action, accelerator="Ctrl+Y")
-edit_menu.add_separator()
-edit_menu.add_command(label="Find", command=find_text, accelerator="Ctrl+F")
+    menu.add_cascade(label=translate.get("view"), menu=view_menu)
+    view_index = menu.index(tk.END)
+    view_menu.add_command(label=translate.get("zoom_in"), command=zoom_in, accelerator="Ctrl++")
+    view_menu.add_command(label=translate.get("zoom_out"), command=zoom_out, accelerator="Ctrl+-")
+    view_menu.add_separator()
+    view_menu.add_command(label=translate.get("show_sidebar"), command=show_sidebar, accelerator="Ctrl+J")
+    view_menu.add_command(label=translate.get("hide_sidebar"), command=hide_sidebar, accelerator="Ctrl+L")
 
-theme_menu = tk.Menu(menu, tearoff=0)
-menu.add_cascade(label="Theme", menu=theme_menu)
-theme_menu.add_command(label="Light", command=lambda: set_theme('light'))
-theme_menu.add_command(label="Dark", command=lambda: set_theme('dark'))
-theme_menu.add_command(label="Dracula", command=lambda: set_theme('dracula'))
-theme_menu.add_command(label="Monokai", command=lambda: set_theme('monokai'))
-theme_menu.add_command(label="Night Owl", command=lambda: set_theme('night_owl'))
-theme_menu.add_command(label="Shades Of Purple", command=lambda: set_theme('shades_of_purple'))
+    menu.add_cascade(label=translate.get("run"), menu=run_menu)
+    run_index = menu.index(tk.END)
+    run_menu.add_command(label=translate.get("run_file"), command=run_code, accelerator="Ctrl+R")
+   
+    menu.add_cascade(label=translate.get("language"), menu=language_menu)
+    language_index = menu.index(tk.END)
+    language_menu.add_radiobutton(label=translate.get("plaintext"), variable=language_var, value='plaintext', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("python"), variable=language_var, value='python', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("javascript"), variable=language_var, value='javascript', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("css"), variable=language_var, value='css', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("html"), variable=language_var, value='html', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("cpp"), variable=language_var, value='cpp', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("cs"), variable=language_var, value='cs', command=highlight_language_change)
 
-view_menu = tk.Menu(menu, tearoff=0)
-menu.add_cascade(label="View", menu=view_menu)
-view_menu.add_command(label="Zoom In", command=zoom_in, accelerator="Ctrl++")
-view_menu.add_command(label="Zoom Out", command=zoom_out, accelerator="Ctrl+-")
-view_menu.add_separator()
-view_menu.add_command(label="Show Sidebar", command=show_sidebar, accelerator="Ctrl+J")
-view_menu.add_command(label="Hide Sidebar", command=hide_sidebar, accelerator="Ctrl+L")
-
-run_menu = tk.Menu(menu, tearoff=0)
-menu.add_cascade(label="Run", menu=run_menu)
-run_menu.add_command(label="Run File", command=run_code, accelerator="Ctrl+R")
-
-language_var = tk.StringVar(value='plaintext')
-language_menu = tk.Menu(menu, tearoff=0)
-menu.add_cascade(label="Language", menu=language_menu)
-def highlight_language_change():
-    print(f"Highlighting as: {language_var.get()}")
-    root.after(10, highlight_full_document)
-
-language_menu.add_radiobutton(label="Plain Text", variable=language_var, value='plaintext', command=highlight_language_change)
-language_menu.add_radiobutton(label="Python", variable=language_var, value='python', command=highlight_language_change)
-language_menu.add_radiobutton(label="JavaScript", variable=language_var, value='javascript', command=highlight_language_change)
-language_menu.add_radiobutton(label="CSS", variable=language_var, value='css', command=highlight_language_change)
-language_menu.add_radiobutton(label="HTML", variable=language_var, value='html', command=highlight_language_change)
-language_menu.add_radiobutton(label="C++", variable=language_var, value='cpp', command=highlight_language_change)
-language_menu.add_radiobutton(label="C#", variable=language_var, value='cs', command=highlight_language_change)
+    menu.add_cascade(label=translate.get("gui_lang"), menu=guilang_menu)
+    guilang_index = menu.index(tk.END)
+    guilang_menu.add_radiobutton(label="English", variable=lang_var, value="en", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Nederlands", variable=lang_var, value="nl", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Español", variable=lang_var, value="es", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Français", variable=lang_var, value="fr", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="日本語", variable=lang_var, value="jp", command=on_lang_change)
 
 def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
@@ -1713,7 +2143,8 @@ def save_session():
         'file': current_file if os.path.exists(current_file) else "",
         'directory': globals()['FOLDER'] if globals()['FOLDER'] != "" else "",
         'theme': current_theme,
-        'language': language_var.get()
+        'language': language_var.get(),
+        'guilang': translate.lang
     }
     with open(config_file, 'w') as f:
         json.dump(session, f, indent=2)
@@ -1744,13 +2175,13 @@ if session.get('file'):
             root.title(f"Slash Code - {os.path.basename(session['file'])}")
             current_file = session['file']
     except Exception as e:
-        print(f"Error loading file: {e}")
+        print(translate.get("error_b1") + f"{e}")
         
 if session.get('directory'):
     try:
         open_folder(session['directory'], True)
     except Exception as e:
-        print(f"Error loading directory: {e}")
+        print(translate.get("error_b2") + f"{e}")
 
 if session.get('theme'):
     set_theme(session['theme'])
@@ -1758,6 +2189,9 @@ else:
     set_theme('light')
 if session.get('language'):
     language_var.set(session['language'])
+if session.get('guilang'):
+    lang_var.set(session['guilang'])
+    on_lang_change()
 highlight_full_document()
 
 
@@ -1774,6 +2208,6 @@ if len(sys.argv) > 1:
             save_session()
             load_session()
         except Exception as e:
-            messagebox.showerror("Error", f"Could not open file:\n{e}")
-
+            messagebox.showerror(translate.get("error_a1"), translate.get("error_a3") + f"{e}")
+            
 root.mainloop()
