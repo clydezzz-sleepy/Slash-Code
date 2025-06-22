@@ -71,6 +71,8 @@ GUILANGS = {
     "zoom_out": "Zoom Out",
     "show_sidebar": "Show Sidebar",
     "hide_sidebar": "Hide Sidebar",
+    "show_minimap": "Show Minimap",
+    "hide_minimap": "Hide Minimap",
     "run": "Run",
     "run_file": "Run File",
     "highlighting_as": "Highlighting as: ",
@@ -81,6 +83,16 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "python_files": "Python Files",
+    "javascript_files": "JavaScript Files",
+    "html_files": "HTML Files",
+    "c_files": "C Files",
+    "cpp_files": "C++ Files",
+    "header_files": "Header Files",
+    "text_files": "Text Files",
+    "cs_files": "C# Files",
+    "css_files": "CSS Files",
+    "all_files": "All Files",
     "error_b1": "Error loading file: ",
     "error_b2": "Error loading directory: "
     },
@@ -125,6 +137,8 @@ GUILANGS = {
     "zoom_out": "Uitzoomen",
     "show_sidebar": "Maak Zijbalk Zichtbaar",
     "hide_sidebar": "Maak Zijbalk Onzichtbaar",
+    "show_minimap": "Maak Minikaart Zichtbaar",
+    "hide_minimap": "Maak Minikaart Onzichtbaar",
     "run": "Uitvoeren",
     "run_file": "Bestand Uitvoeren",
     "highlighting_as": "Wordt gemarkeerd als: ",
@@ -135,6 +149,16 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "python_files": "Python Bestanden",
+    "javascript_files": "JavaScript Bestanden",
+    "html_files": "HTML Bestanden",
+    "c_files": "C Bestanden",
+    "cpp_files": "C++ Bestanden",
+    "header_files": "Headerbestanden",
+    "text_files": "Tekstbestanden",
+    "cs_files": "C# Bestanden",
+    "css_files": "CSS Bestanden",
+    "all_files": "Alle Bestanden",
     "error_b1": "Fout gedurend bestand laden: ",
     "error_b2": "Fout gedurend map laden: "
     },
@@ -178,6 +202,8 @@ GUILANGS = {
     "zoom_out": "Alejar",
     "show_sidebar": "Mostrar barra lateral",
     "hide_sidebar": "Ocultar barra lateral",
+    "show_minimap": "Mostrar minimapa",
+    "hide_minimap": "Ocultar minimapa",
     "run": "Ejecutar",
     "run_file": "Ejecutar archivo",
     "highlighting_as": "Resaltado como: ",
@@ -188,6 +214,16 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "python_files": "Archivos de Python",
+    "javascript_files": "Archivos de JavaScript",
+    "html_files": "Archivos de HTML",
+    "c_files": "Archivos de C",
+    "cpp_files": "Archivos de C++",
+    "header_files": "Archivos de Encabezado",
+    "text_files": "Archivos de Texto",
+    "cs_files": "Archivos de C#",
+    "css_files": "Archivos de CSS",
+    "all_files": "Todos Los Archivos",
     "error_b1": "Error al cargar el archivo: ",
     "error_b2": "Error al cargar el directorio: "
     },
@@ -232,6 +268,8 @@ GUILANGS = {
     "zoom_out": "Rétrécir",
     "show_sidebar": "Afficher la barre latérale",
     "hide_sidebar": "Masquer la barre latérale",
+    "show_minimap": "Afficher la minicarte",
+    "hide_minimap": "Masquer la minicarte",
     "run": "Exécuter",
     "run_file": "Exécuter le fichier",
     "highlighting_as": "Surlignage comme: ",
@@ -242,6 +280,16 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "python_files": "Fichiers Python",
+    "javascript_files": "Fichiers JavaScript",
+    "html_files": "Fichiers HTML",
+    "c_files": "Fichiers C",
+    "cpp_files": "Fichiers C++",
+    "header_files": "Fichiers D'en-tête",
+    "text_files": "fichiers texte",
+    "cs_files": "Fichiers C#",
+    "css_files": "Fichiers CSS",
+    "all_files": "Tous Les Fichiers",
     "error_b1": "Erreur lors du chargement du fichier: ",
     "error_b2": "Erreur lors du chargement du dossier: "
     },
@@ -286,6 +334,8 @@ GUILANGS = {
     "zoom_out": "ズームアウト",
     "show_sidebar": "サイドバーを表示",
     "hide_sidebar": "サイドバーを非表示",
+    "show_minimap": "ミニマップを表示",
+    "hide_minimap": "ミニマップを非表示",
     "run": "実行",
     "run_file": "ファイルを実行",
     "highlighting_as": "ハイライト：",
@@ -296,6 +346,16 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "python_files": "Python ファイル",
+    "javascript_files": "JavaScript ファイル",
+    "html_files": "HTML ファイル",
+    "c_files": "C ファイル",
+    "cpp_files": "C++ ファイル",
+    "header_files": "ヘッダーファイル",
+    "text_files": "テキストファイル",
+    "cs_files": "C# ファイル",
+    "css_files": "CSS ファイル",
+    "all_files": "全てのファイル",
     "error_b1": "ファイルの読み込みエラー：",
     "error_b2": "ディレクトリの読み込みエラー："
 }
@@ -488,8 +548,11 @@ def create_sidebar_buttons():
     )
     open_folder_btn.pack(fill=tk.X, pady=4)
 
+py_keywords = set(keyword.kwlist)
+py_keywords.add("match")
+py_keywords.add("case")
 LANGUAGE_KEYWORDS = {
-    'python': set(keyword.kwlist),
+    'python': py_keywords,
     'javascript': {
     'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
     'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false',
@@ -1009,16 +1072,16 @@ current_file = ""
 def open_file(event=None):
     global current_file
     filetypes = [
-    ("Python files", "*.py"),
-    ("JavaScript files", "*.js"),
-    ("HTML files", "*.html"),
-    ("C files", "*.c"),
-    ("C++ files", "*.cpp *.hpp"),
-    ("Header files", "*.h"),
-    ("Text files", "*.txt"),
-    ("C# files", "*.cs"),
-    ("CSS files", "*.css"),
-    ("All files", "*.py *.js *.html *.c *.cpp *.hpp *.h *.cs *.txt *.css"),
+    (translate.get("python_files"), "*.py"),
+    (translate.get("javascript_files"), "*.js"),
+    (translate.get("html_files"), "*.html"),
+    (translate.get("c_files"), "*.c"),
+    (translate.get("cpp_files"), "*.cpp *.hpp"),
+    (translate.get("header_files"), "*.h"),
+    (translate.get("text_files"), "*.txt"),
+    (translate.get("cs_files"), "*.cs"),
+    (translate.get("css_files"), "*.css"),
+    (translate.get("all_files"), "*.py *.js *.html *.c *.cpp *.hpp *.h *.cs *.txt *.css"),
     ]
     file = filedialog.askopenfilename(filetypes=filetypes)
     if file:
@@ -1118,14 +1181,14 @@ def guess_language_from_content(content):
         return 'css'  
     return 'plaintext'
 
-def highlight_line(event=None):
+def highlight_line(event=None, targ=None):
     line = text.index("insert").split('.')[0]
     region_start = f"{line}.0"
     region_end = f"{line}.end"
     content = text.get(region_start, region_end)
     for tag in text.tag_names():
         text.tag_remove(tag, region_start, region_end)
-    highlight(region_start=region_start, region_end=region_end, content=content)
+    highlight(target=targ, region_start=region_start, region_end=region_end, content=content)
     
 def highlight_full_document():
     highlight(full_document=True)
@@ -1138,31 +1201,33 @@ def mask_comments(content, comment_spans):
             chars[i] = " " 
     return "".join(chars)
 
-def highlight(event=None, full_document=False, region_start=None, region_end=None, content=None):
-    """
-    If full_document is True, highlights the whole file.
-    If False (default), highlights only the current line.
-    """
-    if hasattr(text, "function_signatures"):
-        text.function_signatures.clear()
+def highlight(target=None, event=None, full_document=False, region_start=None, region_end=None, content=None):
+    if target is None:
+        target = text  # Default to main editor
+
+    # Clear function signatures only if target has the attribute
+    if hasattr(target, "function_signatures"):
+        target.function_signatures.clear()
+    
     language = language_var.get()
     keywords = LANGUAGE_KEYWORDS.get(language, set())
     funcs = LANGUAGE_FUNCS.get(language, set())
     html_attr_pattern = r'\b(' + '|'.join(html_attrs) + r')\s*='
 
+    # Determine highlighting region
     if full_document:
-        for tag in text.tag_names():
-            text.tag_remove(tag, "1.0", tk.END)
+        for tag in target.tag_names():
+            target.tag_remove(tag, "1.0", tk.END)
         region_start = "1.0"
         region_end = tk.END
-        content = text.get(region_start, region_end)
+        content = target.get(region_start, region_end)
     elif region_start is None or region_end is None or content is None:
-        for tag in text.tag_names():
-            text.tag_remove(tag, "1.0", tk.END)
-        line = text.index("insert").split('.')[0]
+        for tag in target.tag_names():
+            target.tag_remove(tag, "1.0", tk.END)
+        line = target.index("insert").split('.')[0]
         region_start = f"{line}.0"
         region_end = f"{line}.end"
-        content = text.get(region_start, region_end)
+        content = target.get(region_start, region_end)
 
     if language == "plaintext":
         return
@@ -1191,7 +1256,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                     comment_start = current_pos + hash_pos
                     comment_end = current_pos + len(line)
                     comment_spans.append((comment_start, comment_end))
-                    text.tag_add("comment", f"{region_start}+{comment_start}c", f"{region_start}+{comment_end}c")
+                    target.tag_add("comment", f"{region_start}+{comment_start}c", f"{region_start}+{comment_end}c")
             current_pos += len(line) + 1
 
     elif language in ("javascript", "cpp", "cs", "css"):
@@ -1204,20 +1269,20 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             if is_in_string(s):
                 continue
             comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
         if language in ("cpp", "cs"):
             for match in re.finditer(r'/\*.*?\*/', content, re.DOTALL):
                 s, e = match.start(), match.end()
                 if is_in_string(s):
                     continue
                 comment_spans.append((s, e))
-                text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                target.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
         
     elif language == "html":
         for match in re.finditer(r'<!--.*?-->', content, re.DOTALL):
             s, e = match.start(), match.end()
             comment_spans.append((s, e))
-            text.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
     masked_content = mask_comments(content, comment_spans)
 
@@ -1225,12 +1290,12 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
         # --- Strings ---
         for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', masked_content):
             s, e = match.start(), match.end()
-            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
         # --- At-Rules (e.g. @font-face) ---
         for match in re.finditer(r'@[a-zA-Z_-]+', masked_content):
             s, e = match.start(), match.end()
-            text.tag_add("preprocessor", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("preprocessor", f"{region_start}+{s}c", f"{region_start}+{e}c")
             
         # --- General Keywords ---
         css_keywords = {'none', 'auto', 'inherit', 'initial', 'unset', 'transparent', 'block', 'inline', 'flex', 'grid', 'center', 'normal'}
@@ -1238,55 +1303,55 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             for match in re.finditer(rf'\b{re.escape(keyword)}\b', masked_content):
                 s, e = match.start(), match.end()
                 if not is_in_string_or_comment(s):
-                    text.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                    target.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
         # --- Selectors (before '{') ---
         for match in re.finditer(r'([^{}/][^{}/]*)\s*\{', masked_content):
             selector = match.group(1)
             s = match.start(1)
             e = match.end(1)
-            text.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
         # --- Properties ---
         for match in re.finditer(r'([a-zA-Z-]+)\s*:', masked_content):
             s, e = match.start(1), match.end(1)
-            text.tag_add("function", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("function", f"{region_start}+{s}c", f"{region_start}+{e}c")
  
         # --- Function Calls (e.g. url(), rgb(), clamp()) ---
         for match in re.finditer(r'(\b[a-zA-Z-]+)\s*\(', masked_content):
             s, e = match.start(1), match.end(1)
-            text.tag_add("builtin", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("builtin", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
         # --- Numbers/Units ---
         for match in re.finditer(r'(-?\d*\.?\d+)(px|em|rem|%|vh|vw|vmin|vmax|ex|ch|pt|cm|mm|in|Q|s|ms)?\b', masked_content):
             s, e = match.start(), match.end()
-            text.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
         # --- Hex Colors ---
         for match in re.finditer(r'#[0-9a-fA-F]{3,6}\b', masked_content):
             s, e = match.start(), match.end()
-            text.tag_add("constant", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("constant", f"{region_start}+{s}c", f"{region_start}+{e}c")
            
     # --- Strings ---
-    for match in re.finditer(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'', masked_content):
+    for match in re.finditer(r'("""(?:.|\n)*?"""|\'\'\'(?:.|\n)*?\'\'\'|"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', masked_content):
         s, e = match.start(), match.end()
         string_spans.append((s, e))
-        text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-        escape_pattern = r'\\(\\|[abfnrtv\'"0-9xuU])'
+        target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        escape_pattern = r'\\ |\\(\\|[abfnrtv\'"0-9xuU])'
         for s, e in string_spans:
             string_text = content[s:e]
             for esc in re.finditer(escape_pattern, string_text):
                 esc_start = s + esc.start()
                 esc_end = s + esc.end()
-                text.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
-
+                target.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
+                
     # --- Operators ---       
     if language in ("cpp", "python", "javascript", "cs", "css"):
         operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
         for match in re.finditer(operator_pattern, content):
             s, e = match.start(), match.end()
             if not any(is_in_string_or_comment(i) for i in range(s, e)):
-                text.tag_add("operator", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                target.tag_add("operator", f"{region_start}+{s}c", f"{region_start}+{e}c")
                 
     # --- Builtins ---
     if language == "python":
@@ -1294,13 +1359,13 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
         if builtins:
             for match in re.finditer(r"\b(" + "|".join(map(re.escape, builtins)) + r")\b", content):
                 if not is_in_string_or_comment(match.start()):
-                    text.tag_add("builtin", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+                    target.tag_add("builtin", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
             
     # --- Semicolons (C++, C#, CSS, JavaScript) ---
     for match in re.finditer(r';', content):
         s, e = match.start(), match.end()
         if not is_in_string_or_comment(s):
-            text.tag_add("semicolon", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("semicolon", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
     # --- Preprocessor (C++) ---
     if language == "cpp":
@@ -1313,11 +1378,11 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 hash_pos = line.find('#')
                 directive_start = s + hash_pos
                 directive_end = directive_start + 1 + len(directive)
-                text.tag_add("preprocessor", f"{region_start}+{directive_start}c", f"{region_start}+{directive_end}c")
+                target.tag_add("preprocessor", f"{region_start}+{directive_start}c", f"{region_start}+{directive_end}c")
                 rest_start = directive_end
                 rest_end = e
                 if rest_start < rest_end:
-                    text.tag_add("preprocessor_rest", f"{region_start}+{rest_start}c", f"{region_start}+{rest_end}c")
+                    target.tag_add("preprocessor_rest", f"{region_start}+{rest_start}c", f"{region_start}+{rest_end}c")
                 preproc_spans.append((s, e))
 
     # --- Templates (C++) ---
@@ -1338,7 +1403,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 elif content[i] == '>' and not is_in_string_or_comment(i):
                     depth -= 1
                     if depth == 0:
-                        text.tag_add("template", f"{region_start}+{open_angle}c", f"{region_start}+{i+1}c")
+                        target.tag_add("template", f"{region_start}+{open_angle}c", f"{region_start}+{i+1}c")
                         break
 
     # --- Pointers/References (C++) ---
@@ -1346,26 +1411,26 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
         for match in re.finditer(r'\b([A-Za-z_:][\w:<>]*)\s*(\*+|&)(?=\s*\w)', content):
             ptr_start, ptr_end = match.start(2), match.end(2)
             if not is_in_string_or_comment(ptr_start):
-                text.tag_add("pointer", f"{region_start}+{ptr_start}c", f"{region_start}+{ptr_end}c")
+                target.tag_add("pointer", f"{region_start}+{ptr_start}c", f"{region_start}+{ptr_end}c")
                 
     # --- Members ---
     for match in re.finditer(r'(?<!\d)\.(\w+)\b(?!\s*\()', content):
         member_start = match.start(1)
         member_end = match.end(1)
         if not is_in_string_or_comment(member_start):
-            text.tag_add("member", f"{region_start}+{member_start}c", f"{region_start}+{member_end}c")
+            target.tag_add("member", f"{region_start}+{member_start}c", f"{region_start}+{member_end}c")
 
     # --- Dunder Methods ---
     for match in re.finditer(r'\b(__\w+__)\b', content):
         s, e = match.start(), match.end()
-        text.tag_add("dunder", f"{region_start}+{s}c", f"{region_start}+{e}c")
+        target.tag_add("dunder", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
     # --- Integers ---
     for match in re.finditer(r'\b\d+\b', content):
         s, e = match.start(), match.end()
         if not is_in_string_or_comment(s):
-            text.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
-
+            target.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            
     # --- f-strings (Python, C# for $"{}") ---
     if language == "python" or language == "cs":
         for f_match in re.finditer(r'(?P<prefix>[fFrR|\$]{1,2})(?P<quote>["\'])(?P<body>.*?)(?P=quote)', content, re.DOTALL):
@@ -1376,8 +1441,8 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             body_start = f_match.start('body')
             body_end = f_match.end('body')
             string_spans.append((prefix_start, quote_end))
-            text.tag_add("string", f"{region_start}+{prefix_start}c", f"{region_start}+{quote_end}c")
-            text.tag_add("prefix", f"{region_start}+{prefix_start}c", f"{region_start}+{f_match.end('prefix')}c")
+            target.tag_add("string", f"{region_start}+{prefix_start}c", f"{region_start}+{quote_end}c")
+            target.tag_add("prefix", f"{region_start}+{prefix_start}c", f"{region_start}+{f_match.end('prefix')}c")
             body = f_match.group('body')
             current_pos = body_start
             for part in re.finditer(r'(.*?)(\{.*?\}|$)', body):
@@ -1387,44 +1452,44 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                     lit_start = current_pos
                     lit_end = lit_start + len(literal)
                     string_spans.append((lit_start, lit_end))
-                    text.tag_add("string", f"{region_start}+{lit_start}c", f"{region_start}+{lit_end}c")
+                    target.tag_add("string", f"{region_start}+{lit_start}c", f"{region_start}+{lit_end}c")
                     current_pos = lit_end
                 if expr and expr.startswith('{'):
                     expr_start = current_pos
                     expr_end = current_pos + len(expr)
                     current_pos = expr_end
-                    text.tag_remove("string", f"{region_start}+{expr_start}c", f"{region_start}+{expr_end}c")
+                    target.tag_remove("string", f"{region_start}+{expr_start}c", f"{region_start}+{expr_end}c")
                     inner_text = expr[1:-1]
                     inner_start = expr_start + 1
                     for str_match in re.finditer(r"(['\"])(?:\\.|[^\\])*?\1", inner_text):
                         s = inner_start + str_match.start()
                         e = inner_start + str_match.end()
-                        text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+                        target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
                     for func_match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', inner_text):
                         f_start = inner_start + func_match.start(1)
                         f_end = inner_start + func_match.end(1)
-                        text.tag_add("funccall", f"{region_start}+{f_start}c", f"{region_start}+{f_end}c")
-                    text.tag_add("punctuation", f"{region_start}+{expr_start}c", f"{region_start}+{expr_start+1}c")
-                    text.tag_add("punctuation", f"{region_start}+{expr_end-1}c", f"{region_start}+{expr_end}c")
+                        target.tag_add("funccall", f"{region_start}+{f_start}c", f"{region_start}+{f_end}c")
+                    target.tag_add("punctuation", f"{region_start}+{expr_start}c", f"{region_start}+{expr_start+1}c")
+                    target.tag_add("punctuation", f"{region_start}+{expr_end-1}c", f"{region_start}+{expr_end}c")
                     for var_match in re.finditer(r'\b([a-zA-Z_]\w*)\b', inner_text):
                         v_start = inner_start + var_match.start(1)
                         v_end = inner_start + var_match.end(1)
-                        if not any(text.tag_names(f"{region_start}+{v_start}c")):
-                            text.tag_add("variable", f"{region_start}+{v_start}c", f"{region_start}+{v_end}c")
+                        if not any(target.tag_names(f"{region_start}+{v_start}c")):
+                            target.tag_add("variable", f"{region_start}+{v_start}c", f"{region_start}+{v_end}c")
                     for num_match in re.finditer(r'\b\d+\b', inner_text):
                         n_start = inner_start + num_match.start()
                         n_end = inner_start + num_match.end()
-                        text.tag_add("number", f"{region_start}+{n_start}c", f"{region_start}+{n_end}c")
+                        target.tag_add("number", f"{region_start}+{n_start}c", f"{region_start}+{n_end}c")
                     for dunder_match in re.finditer(r'\b(__\w+__)\b', inner_text):
                         d_start = inner_start + dunder_match.start()
                         d_end = inner_start + dunder_match.end()
-                        text.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
+                        target.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
                     if language in ("cpp", "python", "javascript", "cs"):
                         operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
                         for operator_match in re.finditer(operator_pattern, inner_text):
                             o_start = inner_start + operator_match.start()
                             o_end = inner_start + operator_match.end()
-                            text.tag_add("operator", f"{region_start}+{o_start}c", f"{region_start}+{o_end}c")
+                            target.tag_add("operator", f"{region_start}+{o_start}c", f"{region_start}+{o_end}c")
 
     # --- Keywords, Functions, Class Names, Function Calls, Variables ---
     if keywords:
@@ -1432,28 +1497,28 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             if not is_in_string_or_comment(match.start()):
                 tag_start = f"{region_start}+{match.start()}c"
                 tag_end = f"{region_start}+{match.end()}c"
-                text.tag_add("keyword", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
-                text.tag_add(f"kw_{match.group(0)}", tag_start, tag_end)
+                target.tag_add("keyword", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+                target.tag_add(f"kw_{match.group(0)}", tag_start, tag_end)
     if language in ("python", "cs", "cpp", "javascript"):
         for match in re.finditer(r'\bclass\s+([A-Za-z_][A-Za-z0-9_]*)', content):
             name_start = match.start(1)
             name_end = match.end(1)
             if not is_in_string_or_comment(name_start):
-                text.tag_add("classname", f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
+                target.tag_add("classname", f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
     if funcs:
         for match in re.finditer(r"\b(" + "|".join(map(re.escape, funcs)) + r")\b", content):
             if not is_in_string_or_comment(match.start()):
-                text.tag_add("function", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
-                text.tag_add(f"fn_{match.group(0)}", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+                target.tag_add("function", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+                target.tag_add(f"fn_{match.group(0)}", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
     for match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', content):
         if not is_in_string_or_comment(match.start(1)):
-            text.tag_add("funccall", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+            target.tag_add("funccall", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
     for match in re.finditer(r'\b([a-zA-Z_]\w*)\b', content):
         if is_in_string_or_comment(match.start()):
             continue
         pos = f"{region_start}+{match.start()}c"
-        if not any(text.tag_names(pos)):
-            text.tag_add("variable", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+        if not any(target.tag_names(pos)):
+            target.tag_add("variable", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
     
     # --- Tooltips ---
     if language == "python":
@@ -1466,7 +1531,7 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
             name_start = match.start(1)
             name_end = match.end(1)
             tag_name = f"defsig_{func_name}"
-            text.tag_add(tag_name, f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
+            target.tag_add(tag_name, f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
             after_def = content[match.end():]
             docstring_match = re.match(r'\s*("""|\'\'\')(.*?)\1', after_def, re.DOTALL)
             docstring = docstring_match.group(2).strip() if docstring_match else ""
@@ -1477,29 +1542,30 @@ def highlight(event=None, full_document=False, region_start=None, region_end=Non
                 signature += " -> UnanalyzableType"
             if docstring:
                signature += f"\n\n{docstring}"
-            if not hasattr(text, "function_signatures"):
-                text.function_signatures = {}
-            text.function_signatures[func_name] = signature
+            if hasattr(target, "function_signatures"):
+                if not hasattr(target, "function_signatures"):
+                    target.function_signatures = {}
+                target.function_signatures[func_name] = signature
 
     # --- HTML tags/attributes ---
     if language == "html":
         for match in re.finditer(r'<(\/?\w+)', content):
-            text.tag_add("html_tag", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+            target.tag_add("html_tag", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
         for match in re.finditer(html_attr_pattern, content):
-            text.tag_add("html_attr", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+            target.tag_add("html_attr", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
     if language == "html":
         for match in re.finditer(r'=\s*(".*?"|\'.*?\')', content):
             s, e = match.start(1), match.end(1)
-            text.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
     # --- Constants (ALLCAPS) ---
     if language in ['python', 'javascript', 'cpp']:
         for match in re.finditer(r'\b([A-Z][A-Z0-9_]*[A-Z][A-Z0-9_]*)\b', content):
             if not is_in_string_or_comment(match.start()):
-                text.tag_add("constant", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
+                target.tag_add("constant", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
     for s, e in comment_spans:
-        text.tag_remove("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-    text.tag_raise("comment")
+        target.tag_remove("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+    target.tag_raise("comment")
 
 themes = {
     'light': {
@@ -1627,11 +1693,59 @@ line_numbers = tk.Text(
     yscrollcommand=lambda *args: None  # Disable own scroll
 )
 
+current_theme = 'light'
+theme_var = tk.StringVar(value=current_theme)
+
 line_numbers.pack(side=tk.LEFT, fill=tk.Y)
 text = scrolledtext.ScrolledText(frame, font=font, undo=True)
 text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 text.bind("<Return>", auto_indent)
 text.bind("}", handle_closing_brace)
+
+minimap_frame = tk.Frame(root, width=0, bg=themes[theme_var.get()]['bg'])
+minimap_frame.place(relx=0.99065, rely=0.515, anchor="ne")
+minimap_font = tk.font.Font(family="Consolas", size=4)
+def set_minimap():
+    global minimap
+    minimap = tk.Text(minimap_frame, font=minimap_font, width=62, height=78, state='disabled', bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'])
+set_minimap()
+minimap.pack(fill=tk.Y, expand=True)
+
+for tag, color in themes[theme_var.get()].items():
+    if tag in ["bg", "fg", "line_numbers", "cursor"]: continue
+    minimap.tag_configure(tag, foreground=color)
+    
+def highlight_minimap():
+    content = text.get("1.0", "end-1c")
+    minimap.config(state='normal')
+    minimap.delete("1.0", "end")
+    minimap.insert("1.0", content)
+    minimap.config(state='disabled')
+    minimap.config(state='normal')
+    highlight(target=minimap, content=content)
+    minimap.config(state='disabled')
+
+
+def hide_minimap():
+    minimap.pack_forget()
+    
+def show_minimap():
+    minimap.pack(fill=tk.Y, expand=True)
+    
+def update_minimap(event=None):
+    global minimap
+    if not minimap:
+        return 
+    minimap.config(state='normal')
+    minimap.delete('1.0', tk.END)
+    minimap.insert('1.0', text.get('1.0', tk.END))
+    minimap.config(state='disabled')
+    
+def sync_scroll(*args):
+    text.yview_moveto(text.yview()[0])
+    minimap.yview_moveto(text.yview()[0])
+
+text.bind('<<Modified>>', lambda e: (update_minimap(), text.edit_modified(0)))
 
 def zoom_in(event=None):
     global font_size, font
@@ -1649,20 +1763,26 @@ def zoom_out(event=None):
     line_numbers.config(font=font)
     update_line_numbers()
 
-def sync_scroll(event):
+def sync_scroll(event=None):
     line_numbers.yview_moveto(text.yview()[0])
+    minimap.yview_moveto(text.yview()[0])
     line_numbers.config(yscrollcommand=lambda *args: None)
     
 def on_scroll(event):
     sync_scroll(event)
     update_line_numbers()
+    
+def on_minimap_click(event):
+    height = minimap.winfo_height()
+    clicked_fraction = event.y / height
+    text.yview_moveto(clicked_fraction)
+    update_minimap()
+    
+minimap.bind("<Button-1>", on_minimap_click)
 text.bind("<MouseWheel>", on_scroll)
 
 text.bind("<Button-4>", on_scroll)
 text.bind("<Button-5>", on_scroll)
-
-current_theme = 'light'
-theme_var = tk.StringVar(value=current_theme)
 
 sidebar = tk.Frame(frame, width=200, bg=themes[theme_var.get()]['bg'])
 sidebar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -1729,6 +1849,7 @@ def on_tree_double_click(event=None):
                 globals()['current_file'] = path
                 update_line_numbers()
                 highlight_full_document()
+                highlight(target=minimap)
         except Exception as e:
             messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
         
@@ -1766,6 +1887,13 @@ def set_theme(theme_name):
     text.config(bg=theme['bg'], fg=theme['fg'], insertbackground=theme['cursor'])
     line_numbers.config(bg=theme['line_numbers'], fg=theme['fg'])
     file_listbox.config(bg=theme['line_numbers'], fg=theme['fg'], selectbackground=theme['keyword'])
+    if minimap:
+        minimap.config(bg=theme['bg'], fg=theme['fg'])
+        for tag, color in theme.items():
+            if tag in ["bg", "fg", "line_numbers", "cursor"]: 
+                continue
+            minimap.tag_configure(tag, foreground=color)
+    minimap_frame.configure(bg=theme['bg'])
     style = ttk.Style()
     style.theme_use('clam')
     style.configure("Treeview",
@@ -2053,9 +2181,11 @@ def on_key_release(event=None):
     update_line_numbers()
                 
 text.unbind("<KeyRelease>")
-text.bind('<KeyRelease>', on_key_release)
+text.bind('<KeyRelease>', lambda e: (on_key_release(), sync_scroll()))
+text.bind('<MouseWheel>', lambda e: sync_scroll())
+text.bind('<ButtonRelease-1>', lambda e: sync_scroll())
 text.bind('<Configure>', update_line_numbers)
-text.bind("<<Paste>>", lambda e: (root.after(10, highlight_full_document)))
+text.bind("<<Paste>>", lambda: (root.after(10, highlight_full_document)))
 text.bind('<Return>', auto_indent)
 text.bind('<BackSpace>', update_line_numbers)
 text.bind("<Control-o>", open_file)
@@ -2112,6 +2242,8 @@ def set_ui():
     view_menu.add_separator()
     view_menu.add_command(label=translate.get("show_sidebar"), command=show_sidebar, accelerator="Ctrl+J")
     view_menu.add_command(label=translate.get("hide_sidebar"), command=hide_sidebar, accelerator="Ctrl+L")
+    view_menu.add_command(label=translate.get("show_minimap"), command=show_minimap, accelerator="Ctrl+Shift+H")
+    view_menu.add_command(label=translate.get("hide_minimap"), command=hide_minimap, accelerator="Ctrl+K")
 
     menu.add_cascade(label=translate.get("run"), menu=run_menu)
     run_index = menu.index(tk.END)
@@ -2209,5 +2341,8 @@ if len(sys.argv) > 1:
             load_session()
         except Exception as e:
             messagebox.showerror(translate.get("error_a1"), translate.get("error_a3") + f"{e}")
+            
+root.after(100, update_minimap)
+update_line_numbers()
             
 root.mainloop()
