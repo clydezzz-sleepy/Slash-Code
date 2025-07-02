@@ -9,7 +9,9 @@ import json
 import subprocess
 import tempfile
 import sys
-import platform
+import random
+from platform import *
+import threading
 from tkinter import filedialog, scrolledtext, messagebox, ttk, font
 current_file = ""
 FOLDER = ""
@@ -37,6 +39,15 @@ GUILANGS = {
     "error_a1": "Error",
     "error_a2": "Could not open file",
     "error_a3": "Could not open file:\n",
+    "error_c0": "Folder button update error:",
+    "error_c1": "Menu label update error:",
+    "error_c2": "File label update error:",
+    "error_c3": "Edit label update error:",
+    "error_c4": "Theme label update error:",
+    "error_c5": "Run label update error:",
+    "error_c6": "View label update error:",
+    "error_c7": "Language label update error:",
+    "error_c8": "GUI language label update error:",
     "find": "Find",
     "find_query": "Find:",
     "runner_not_found": " not found!\n",
@@ -52,6 +63,8 @@ GUILANGS = {
     "new": "New",
     "open": "Open",
     "save": "Save",
+    "toggle_new_file_saving": "Toggle New File Saving",
+    "clean_temp_files": "Clean Temporary Files",
     "exit": "Exit",
     "edit": "Edit",
     "undo": "Undo",
@@ -64,6 +77,7 @@ GUILANGS = {
     "theme_monokai": "Monokai",
     "theme_night_owl": "Night Owl",
     "theme_shades_of_purple": "Shades Of Purple",
+    "theme_high_contrast": "High Contrast",
     "open_folder": "Open Folder",
     "changed_language_to": "Changed language to ",
     "view": "View",
@@ -73,6 +87,8 @@ GUILANGS = {
     "hide_sidebar": "Hide Sidebar",
     "show_minimap": "Show Minimap",
     "hide_minimap": "Hide Minimap",
+    "toggle_fullscreen": "Toggle Fullscreen",
+    "exit_fullscreen": "Exit Fullscreen",
     "run": "Run",
     "run_file": "Run File",
     "highlighting_as": "Highlighting as: ",
@@ -83,6 +99,8 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
     "python_files": "Python Files",
     "javascript_files": "JavaScript Files",
     "html_files": "HTML Files",
@@ -92,6 +110,8 @@ GUILANGS = {
     "text_files": "Text Files",
     "cs_files": "C# Files",
     "css_files": "CSS Files",
+    "markdown_files": "Markdown Files",
+    "renpy_files": "Ren'Py Files",
     "all_files": "All Files",
     "error_b1": "Error loading file: ",
     "error_b2": "Error loading directory: "
@@ -103,6 +123,15 @@ GUILANGS = {
     "error_a1": "Fout",
     "error_a2": "Kon niet bestand openen",
     "error_a3": "Kon niet bestand openen:\n",
+    "error_c0": "Fout bij het bijwerken van de mapknop:",
+    "error_c1": "Fout bij het bijwerken van het menulabel:",
+    "error_c2": "Fout bij het bijwerken van het bestandslabel:",
+    "error_c3": "Fout bij het bijwerken van het label:",
+    "error_c4": "Fout bij het bijwerken van het themalabel:",
+    "error_c5": "Fout bij het uitvoeren van de labelupdate:",
+    "error_c6": "Fout bij het bijwerken van het label weergeven:",
+    "error_c7": "Fout bij het bijwerken van het taallabel:",
+    "error_c8": "Fout bij het bijwerken van het GUI-taallabel:",
     "find": "Vind",
     "find_query": "Vind:",
     "runner_not_found": " niet gevonden!\n",
@@ -118,6 +147,8 @@ GUILANGS = {
     "new": "Nieuw",
     "open": "Open",
     "save": "Opslaan",
+    "toggle_new_file_saving": "Nieuw Bestand Opslaan Inschakelen",
+    "clean_temp_files": "Temporaire Bestanden Wissen",
     "exit": "Verlaten",
     "edit": "Bewerken",
     "undo": "Ongedaan Maken",
@@ -130,6 +161,7 @@ GUILANGS = {
     "theme_monokai": "Monokai",
     "theme_night_owl": "Nacht Uil",
     "theme_shades_of_purple": "Tinten Van Paars",
+    "theme_high_contrast": "Hoog Contrast",
     "open_folder": "Open Map",
     "changed_language_to": "Taal veranderd naar ",
     "view": "Kijken",
@@ -139,6 +171,8 @@ GUILANGS = {
     "hide_sidebar": "Maak Zijbalk Onzichtbaar",
     "show_minimap": "Maak Minikaart Zichtbaar",
     "hide_minimap": "Maak Minikaart Onzichtbaar",
+    "toggle_fullscreen": "Volledig Scherm Inschakelen",
+    "exit_fullscreen": "Volledig Scherm Verlaten",
     "run": "Uitvoeren",
     "run_file": "Bestand Uitvoeren",
     "highlighting_as": "Wordt gemarkeerd als: ",
@@ -149,6 +183,8 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
     "python_files": "Python Bestanden",
     "javascript_files": "JavaScript Bestanden",
     "html_files": "HTML Bestanden",
@@ -158,6 +194,8 @@ GUILANGS = {
     "text_files": "Tekstbestanden",
     "cs_files": "C# Bestanden",
     "css_files": "CSS Bestanden",
+    "markdown_files": "Markdown Bestanden",
+    "renpy_files": "Ren'Py Bestanden",
     "all_files": "Alle Bestanden",
     "error_b1": "Fout gedurend bestand laden: ",
     "error_b2": "Fout gedurend map laden: "
@@ -168,6 +206,15 @@ GUILANGS = {
     "error_a1": "Error",
     "error_a2": "No se pudo abrir el archivo",
     "error_a3": "No se pudo abrir el archivo:\n",
+    "error_c0": "Error al actualizar el botón de carpeta:",
+    "error_c1": "Error al actualizar la etiqueta del menú:",
+    "error_c2": "Error al actualizar la etiqueta del archivo:",
+    "error_c3": "Error al actualizar la etiqueta de edición:",
+    "error_c4": "Error al actualizar la etiqueta del tema:",
+    "error_c5": "Error al ejecutar la actualización de la etiqueta:",
+    "error_c6": "Error al actualizar la etiqueta de la vista:",
+    "error_c7": "Error al actualizar la etiqueta del idioma:",
+    "error_c8": "Error al actualizar la etiqueta del idioma de la GUI:",
     "find": "Buscar",
     "find_query": "Buscar:",
     "runner_not_found": " no encontrado!\n",
@@ -183,6 +230,8 @@ GUILANGS = {
     "new": "Nuevo",
     "open": "Abrir",
     "save": "Guardar",
+    "toggle_new_file_saving": "Activar el guardado de nuevos archivos",
+    "clean_temp_files": "Limpiar archivos temporales",
     "exit": "Salir",
     "edit": "Editar",
     "undo": "Deshacer",
@@ -204,6 +253,8 @@ GUILANGS = {
     "hide_sidebar": "Ocultar barra lateral",
     "show_minimap": "Mostrar minimapa",
     "hide_minimap": "Ocultar minimapa",
+    "toggle_fullscreen": "Activar pantalla completa",
+    "exit_fullscreen": "Salir de pantalla completa",
     "run": "Ejecutar",
     "run_file": "Ejecutar archivo",
     "highlighting_as": "Resaltado como: ",
@@ -214,6 +265,8 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
     "python_files": "Archivos de Python",
     "javascript_files": "Archivos de JavaScript",
     "html_files": "Archivos de HTML",
@@ -223,6 +276,8 @@ GUILANGS = {
     "text_files": "Archivos de Texto",
     "cs_files": "Archivos de C#",
     "css_files": "Archivos de CSS",
+    "markdown_files": "Archivos de Markdown",
+    "renpy_files": "Archivos de Ren'Py",
     "all_files": "Todos Los Archivos",
     "error_b1": "Error al cargar el archivo: ",
     "error_b2": "Error al cargar el directorio: "
@@ -234,6 +289,14 @@ GUILANGS = {
     "error_a1": "Erreur",
     "error_a2": "Impossible d'ouvrir le fichier",
     "error_a3": "Impossible d'ouvrir le fichier:\n",
+    "error_c0": "Erreur de mise à jour du bouton de dossier:",
+    "error_c1": "Erreur de mise à jour du libellé du menu:",
+    "error_c2": "Erreur de mise à jour du libellé du fichier:",
+    "error_c3": "Erreur de mise à jour de l'étiquette de modification:",
+    "error_c5": "Erreur de mise à jour de l'étiquette d'exécution:",
+    "error_c6": "Erreur de mise à jour de l'étiquette d'affichage:",
+    "error_c7": "Erreur de mise à jour du libellé de langue:",
+    "error_c8": "Erreur de mise à jour du libellé de langue de l'interface graphique:",
     "find": "Rechercher",
     "find_query": "Rechercher:",
     "runner_not_found": " introuvable!\n",
@@ -249,6 +312,8 @@ GUILANGS = {
     "new": "Nouveau",
     "open": "Ouvrir",
     "save": "Enregistrer",
+    "toggle_new_file_saving": "Activer l'enregistrement d'un nouveau fichier",
+    "clean_temp_files": "Nettoyer les fichiers temporaires",
     "exit": "Quitter",
     "edit": "Éditer",
     "undo": "Annuler",
@@ -261,6 +326,7 @@ GUILANGS = {
     "theme_monokai": "Monokai",
     "theme_night_owl": "Chouette Nocturne",
     "theme_shades_of_purple": "Nuances de Violet",
+    "theme_high_contrast": "Contraste Élevé",
     "open_folder": "Ouvrir le dossier",
     "changed_language_to": "Langue changée en ",
     "view": "Affichage",
@@ -270,6 +336,8 @@ GUILANGS = {
     "hide_sidebar": "Masquer la barre latérale",
     "show_minimap": "Afficher la minicarte",
     "hide_minimap": "Masquer la minicarte",
+    "toggle_fullscreen": "Activer le plein écran",
+    "exit_fullscreen": "Quitter le plein écran",
     "run": "Exécuter",
     "run_file": "Exécuter le fichier",
     "highlighting_as": "Surlignage comme: ",
@@ -280,6 +348,8 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
     "python_files": "Fichiers Python",
     "javascript_files": "Fichiers JavaScript",
     "html_files": "Fichiers HTML",
@@ -289,6 +359,8 @@ GUILANGS = {
     "text_files": "fichiers texte",
     "cs_files": "Fichiers C#",
     "css_files": "Fichiers CSS",
+    "markdown_files": "Fichiers Markdown",
+    "renpy_files": "Fichiers Ren'Py",
     "all_files": "Tous Les Fichiers",
     "error_b1": "Erreur lors du chargement du fichier: ",
     "error_b2": "Erreur lors du chargement du dossier: "
@@ -300,6 +372,15 @@ GUILANGS = {
     "error_a1": "エラー",
     "error_a2": "ファイルを開けませんでした",
     "error_a3": "ファイルを開けませんでした:\n",
+    "error_c0": "フォルダボタン更新エラー:",
+    "error_c1": "メニューラベル更新エラー:",
+    "error_c2": "ファイルラベル更新エラー:",
+    "error_c3": "編集ラベル更新エラー:",
+    "error_c4": "テーマラベル更新エラー:",
+    "error_c5": "実行ラベル更新エラー:",
+    "error_c6": "表示ラベル更新エラー:",
+    "error_c7": "言語ラベル更新エラー:",
+    "error_c8": "GUI言語ラベル更新エラー:",
     "find": "検索",
     "find_query": "検索：",
     "runner_not_found": " が見つかりません！\n",
@@ -315,6 +396,8 @@ GUILANGS = {
     "new": "新規",
     "open": "開く",
     "save": "保存",
+    "toggle_new_file_saving": "新しいファイルの保存を切り替える",
+    "clean_temp_files": "一時ファイルを消去する",
     "exit": "終了",
     "edit": "編集",
     "undo": "元に戻す",
@@ -327,6 +410,7 @@ GUILANGS = {
     "theme_monokai": "モノカイ",
     "theme_night_owl": "ナイトアウル",
     "theme_shades_of_purple": "紫の影",
+    "theme_high_contrast": "高コントラスト",
     "open_folder": "フォルダーを開く",
     "changed_language_to": "言語", # Japanese puts the topic in the middle, not the end, so we'll have to put the verb part to tbe end.
     "view": "表示",
@@ -336,6 +420,8 @@ GUILANGS = {
     "hide_sidebar": "サイドバーを非表示",
     "show_minimap": "ミニマップを表示",
     "hide_minimap": "ミニマップを非表示",
+    "toggle_fullscreen": "全画面表示の切り替え",
+    "exit_fullscreen": "全画面表示を終了",
     "run": "実行",
     "run_file": "ファイルを実行",
     "highlighting_as": "ハイライト：",
@@ -346,6 +432,8 @@ GUILANGS = {
     "html": "HTML",
     "cpp": "C++",
     "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
     "python_files": "Python ファイル",
     "javascript_files": "JavaScript ファイル",
     "html_files": "HTML ファイル",
@@ -355,6 +443,8 @@ GUILANGS = {
     "text_files": "テキストファイル",
     "cs_files": "C# ファイル",
     "css_files": "CSS ファイル",
+    "markdown_files": "Markdown ファイル",
+    "renpy_files": "Ren'Py Files",
     "all_files": "全てのファイル",
     "error_b1": "ファイルの読み込みエラー：",
     "error_b2": "ディレクトリの読み込みエラー："
@@ -402,7 +492,10 @@ file_index = edit_index = theme_index = view_index = run_index = language_index 
 
 def highlight_language_change():
     print(translate.get("highlighting_as") + f"{language_var.get()}")
-    root.after(10, highlight_full_document)
+    if os.path.getsize(current_file) > 200_000:
+            root.after(150, highlight_full_document)
+    else:
+        root.after(10, highlight_full_document)
 
 class ToolTip:
     """
@@ -470,23 +563,24 @@ def update_ui_text():
         menu.entryconfig(language_index, label=translate.get("language"))
         menu.entryconfig(guilang_index, label=translate.get("gui_lang"))
     except Exception as e:
-        print("Menu label update error:", e)
+        print(translate.get("error_c1"), e)
 
     try:
         file_menu.entryconfig(0, label=translate.get("new"))
         file_menu.entryconfig(1, label=translate.get("open"))
         file_menu.entryconfig(2, label=translate.get("open_folder"))
         file_menu.entryconfig(3, label=translate.get("save"))
-        file_menu.entryconfig(5, label=translate.get("exit"))
+        file_menu.entryconfig(5, label=translate.get("clean_temp_files"))
+        file_menu.entryconfig(6, label=translate.get("exit"))
     except Exception as e:
-        print("File menu update error:", e)
+        print(translate.get("error_c2"), e)
 
     try:
         edit_menu.entryconfig(0, label=translate.get("undo"))
         edit_menu.entryconfig(1, label=translate.get("redo"))
         edit_menu.entryconfig(3, label=translate.get("find"))
     except Exception as e:
-        print("Edit menu update error:", e)
+        print(translate.get("error_c3"), e)
 
     try:
         theme_menu.entryconfig(0, label=translate.get("theme_light"))
@@ -495,8 +589,9 @@ def update_ui_text():
         theme_menu.entryconfig(3, label=translate.get("theme_monokai"))
         theme_menu.entryconfig(4, label=translate.get("theme_night_owl"))
         theme_menu.entryconfig(5, label=translate.get("theme_shades_of_purple"))
+        theme_menu.entryconfig(6, label=translate.get("theme_high_contrast"))
     except Exception as e:
-        print("Theme menu update error:", e)
+        print(translate.get("error_c4"), e)
 
     try:
         view_menu.entryconfig(0, label=translate.get("zoom_in"))
@@ -504,12 +599,12 @@ def update_ui_text():
         view_menu.entryconfig(3, label=translate.get("show_sidebar"))
         view_menu.entryconfig(4, label=translate.get("hide_sidebar"))
     except Exception as e:
-        print("View menu update error:", e)
+        print(translate.get("error_c5"), e)
 
     try:
         run_menu.entryconfig(0, label=translate.get("run_file"))
     except Exception as e:
-        print("Run menu update error:", e)
+        print(translate.get("error_c6"), e)
 
     try:
         language_menu.entryconfig(0, label=translate.get("plaintext"))
@@ -519,14 +614,16 @@ def update_ui_text():
         language_menu.entryconfig(4, label=translate.get("html"))
         language_menu.entryconfig(5, label=translate.get("cpp"))
         language_menu.entryconfig(6, label=translate.get("cs"))
+        language_menu.entryconfig(7, label=translate.get("markdown"))
+        language_menu.entryconfig(8, label=translate.get("renpy"))
     except Exception as e:
-        print("Language menu update error:", e)
+        print(translate.get("error_c7"), e)
         
     if open_folder_btn:
         try:
             open_folder_btn.config(text=translate.get("open_folder"))
         except Exception as e:
-            print("Folder button update error: ", e)
+            print(translate.get("error_c0"), e)
             
     try:
         guilang_menu.entryconfig(0, label="English")
@@ -535,7 +632,7 @@ def update_ui_text():
         guilang_menu.entryconfig(3, label="Français")
         guilang_menu.entryconfig(4, label="日本語")
     except Exception as e:
-        print("GUI lang menu update error:", e)
+        print(translate.get("error_c8"), e)
 
 def create_sidebar_buttons():
     global open_folder_btn
@@ -551,6 +648,24 @@ def create_sidebar_buttons():
 py_keywords = set(keyword.kwlist)
 py_keywords.add("match")
 py_keywords.add("case")
+renpy_kw = {
+    'label', 'menu', 'jump', 'call', 'return', 'if', 'elif', 'else', 'while', 'for', 'init', 'python', 
+    'screen', 'show', 'hide', 'scene', 'with', 'as', 'define', 'default', 'image', 'transform', 'style', 'window', 'say',
+    'play', 'stop', 'pause', 'voice', 'queue', 'extend', 'narrator', 'character', 'set', 'add', 'remove', 'on',
+    'at', 'from', 'to', 'block', 'pass', 'break', 'continue', 'early', 'all',
+    'init', 'init', 'offset', 'init python', 'init python early', 'init python hide', 'init python in',
+    'style_group', 'style_prefix', 'showif', 'hideif', 'onlayer', 'zorder', 'key', 'timer', 'viewport', 'vbox',
+    'hbox', 'grid', 'textbutton', 'imagebutton', 'imagemap', 'bar', 'slider', 'input', 'hotspot', 'hotbar', 'fixed',
+    'frame', 'button', 'action', 'xalign', 'yalign', 'align', 'pos', 'xpos', 'ypos', 'text', 'size', 'xsize', 'ysize', 'modal',
+    'ground', 'selected', 'insensitive', 'idle', 'hover', 'activate', 'deactivate', 'selected_hover',
+    'selected_idle', 'insensitive_hover', 'insensitive_idle', 'insensitive_selected', 'insensitive_selected_idle',
+    'insensitive_selected_hover', 'selected_activate', 'selected_deactivate', 'selected_insensitive',
+    'selected_insensitive_idle', 'selected_insensitive_hover', 'window show', 'window hide', 'window auto', 
+    'window none', 'window', 'voice', 'queue', 'extend',
+    'renpy', 'define', 'default', 'config', 'persistent', 'store', 'gui', 'style', 'theme'
+    }
+renpy_kw.update(py_keywords)
+
 LANGUAGE_KEYWORDS = {
     'python': py_keywords,
     'javascript': {
@@ -599,8 +714,37 @@ LANGUAGE_KEYWORDS = {
     'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string',
     'struct', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort',
     'using', 'virtual', 'void', 'volatile', 'while'
+    },
+    'renpy': renpy_kw
 }
-}
+
+renpy_fn = {
+        'renpy.say', 'renpy.scene', 'renpy.show', 'renpy.hide', 'renpy.jump', 'renpy.call',
+        'renpy.pause', 'renpy.play', 'renpy.stop', 'renpy.notify', 'renpy.input',
+        'renpy.open_url', 'renpy.queue_event', 'renpy.rollback', 'renpy.save', 'renpy.load',
+        'renpy.quit', 'renpy.music.stop', 'renpy.music.play', 'renpy.music.set_volume',
+        'renpy.music.get_pos', 'renpy.music.get_playing', 'renpy.music.get_queue',
+        'renpy.music.set_pan', 'renpy.music.set_loop', 'renpy.music.set_fadein',
+        'renpy.music.set_fadeout', 'renpy.show_screen', 'renpy.hide_screen',
+        'renpy.get_screen', 'renpy.get_screen_variable', 'renpy.set_screen_variable',
+        'renpy.invoke_in_thread', 'renpy.invoke_in_main_thread', 'renpy.restart_interaction',
+        'renpy.get_mouse_pos', 'renpy.get_on_battery', 'renpy.get_physical_size',
+        'renpy.get_refresh_rate', 'renpy.get_renderer_info', 'renpy.get_say_image_tag',
+        'renpy.get_say_attributes', 'renpy.get_placement', 'renpy.get_registered_image',
+        'renpy.get_return_stack', 'renpy.get_sdl_dll', 'renpy.get_sdl_window_pointer',
+        'renpy.is_init_phase', 'renpy.is_mouse_visible', 'renpy.is_pixel_opaque',
+        'renpy.is_seen', 'renpy.is_selected', 'renpy.is_sensitive', 'renpy.is_skipping',
+        'renpy.is_start_interact', 'renpy.list_files', 'renpy.list_images', 'renpy.load_module',
+        'renpy.load_string', 'renpy.maximum_framerate', 'renpy.notify', 'renpy.open_url',
+        'renpy.predicting', 'renpy.queue_event', 'renpy.quit', 'renpy.rollback', 'renpy.run',
+        'renpy.save', 'renpy.say', 'renpy.scene', 'renpy.screenshot', 'renpy.set_autoreload',
+        'renpy.set_focus', 'renpy.set_mouse_pos', 'renpy.set_physical_size', 'renpy.set_return_stack',
+        'renpy.set_screen_variable', 'renpy.show', 'renpy.show_layer_at', 'renpy.show_screen',
+        'renpy.showing', 'renpy.shown_window', 'renpy.split_properties', 'renpy.stop_skipping',
+        'renpy.transition', 'renpy.try_compile', 'renpy.try_eval', 'renpy.version', 'renpy.vibrate',
+        'renpy.warp_to_line', 'renpy.watch', 'renpy.with_statement'
+    }
+renpy_fn.update(dir(builtins))
 
 LANGUAGE_FUNCS = {
     'python': dir(builtins),
@@ -644,7 +788,12 @@ LANGUAGE_FUNCS = {
     'html': {}, # HTML doesn't have any functions (you'd need to use JavaScript).
     'cs': {
     'Console.WriteLine', 'Console.ReadLine', 'Math.Abs', 'Math.Pow', 'Math.Sqrt', 'ToString', 'Equals', 'GetHashCode', 'GetType', 'Parse'
-    }
+    },
+    'markdown': {
+        '#', '##', '###', '####', '#####', '######', '-', '*', '+', '>', 
+        '`', '```'
+    },
+    'renpy': renpy_fn
 }
 
 LANGUAGE_TYPES = {
@@ -662,6 +811,10 @@ LANGUAGE_TYPES = {
     "html": set(),
     "cs": {
     'int', 'float', 'double', 'decimal', 'string', 'char', 'bool', 'object', 'var', 'dynamic', 'long', 'short', 'byte', 'uint', 'ulong', 'ushort', 'sbyte'
+    },
+    "markdown": set(),
+    "renpy": {
+        "int", "float", "str", "bool", "list", "tuple", "dict", "set", "object", "bytes"
     }
 }
 
@@ -694,13 +847,13 @@ TOOLTIP_INFO = {
             'print': 'Outputs text to console and buffers to the stream if the flush parameter isn\'t truthy. The object inputted inside of the print function will get parsed, evaluated and get converted into a string to properly print the output to the console.',
             'len': 'Gets length of an object of an iterable, whether that may be an integer, list, set, etc. This can be used to check the amount of items in a huge list, for example.',
             'range': 'Generates a sequence of numbers and can be used in a for loop to do something every time a loop finishes.',
-            'str': 'Converts an object to a string.',
-            'int': 'Converts an object to an integer',
+            'str': 'Converts an object to a string or may be used as an object type specifier.',
+            'int': 'Converts an object to an integer or may be used as an object type specifier.',
             'list': 'May be used as an object type specifier or may be used with parentheses to convert an object to a list of iterables.',
             'dict': 'May be used as an object type specifier or may be used with parentheses to convert an object to a dictionary of key-value pairs.',
             'open': 'Opens a file object with the type of TextIOWrapper[_WrappedBuffer] to convert the content of a file to a string for reading and writing. It is most likely you\'ll use the as keyword to genuinely execute an action with the file itself.',
             'input': 'Gets user input and returns the text the user inputted into the stream. This may be used as a confirmation for something important or anything else.',
-            'type': 'Checks the type of the object and returns it.',
+            'type': 'Checks the type of the object and returns it. In Python 3.13, this keyword can also indicate the beginning of a \'type statement\'.',
         }
     },
     'javascript': {
@@ -1062,42 +1215,64 @@ TOOLTIP_INFO = {
   }
 }
 
+current_file = ""
+
 def new_file(event=None):
     text.delete(1.0, tk.END)
     update_line_numbers()
     root.title("Slash Code")
-    
-current_file = ""
 
 def open_file(event=None):
     global current_file
     filetypes = [
-    (translate.get("python_files"), "*.py"),
-    (translate.get("javascript_files"), "*.js"),
-    (translate.get("html_files"), "*.html"),
-    (translate.get("c_files"), "*.c"),
-    (translate.get("cpp_files"), "*.cpp *.hpp"),
-    (translate.get("header_files"), "*.h"),
-    (translate.get("text_files"), "*.txt"),
-    (translate.get("cs_files"), "*.cs"),
-    (translate.get("css_files"), "*.css"),
-    (translate.get("all_files"), "*.py *.js *.html *.c *.cpp *.hpp *.h *.cs *.txt *.css"),
+        (translate.get("python_files"), "*.py"),
+        (translate.get("javascript_files"), "*.js"),
+        (translate.get("html_files"), "*.html"),
+        (translate.get("c_files"), "*.c"),
+        (translate.get("cpp_files"), "*.cpp *.hpp"),
+        (translate.get("header_files"), "*.h"),
+        (translate.get("text_files"), "*.txt"),
+        (translate.get("cs_files"), "*.cs"),
+        (translate.get("css_files"), "*.css"),
+        (translate.get("markdown_files"), "*.md *.markdown"),
+        (translate.get("renpy_files"), "*.rpy"),
+        (translate.get("all_files"), "*.*"),
     ]
-    file = filedialog.askopenfilename(filetypes=filetypes)
-    if file:
-        current_file = file
-        with open(file, 'r', encoding='utf-8') as f:
-            code = f.read()
-            text.delete(1.0, tk.END)
-            text.insert(tk.END, code)
-            text.edit_separator()
-            root.title(f"Slash Code - {os.path.basename(file)}")
-            lang = get_language(file)
-            if lang == 'plaintext':
-                lang = guess_language_from_content(code)
-            language_var.set(lang)
-        update_line_numbers()
-        highlight_full_document()
+    file_path = filedialog.askopenfilename(filetypes=filetypes)
+    
+    if file_path:
+        current_file = file_path
+        threading.Thread(
+            target=read_file_thread, 
+            args=(file_path,),
+            daemon=True
+        ).start()
+
+def read_file_thread(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        root.after(0, update_gui, file_path, content)
+    except Exception as e:
+        root.after(0, show_error, e)
+
+def update_gui(file_path, content):
+    text.delete(1.0, tk.END)
+    text.insert(tk.END, content)
+    text.edit_separator()
+    root.title(f"Slash Code - {os.path.basename(file_path)}")
+    lang = get_language(file_path)
+    if lang == 'plaintext':
+        lang = guess_language_from_content(content)
+    language_var.set(lang)
+    update_line_numbers()
+    highlight_full_document()
+
+def show_error(e):
+    messagebox.showerror(
+        translate.get("error_a1"),
+        translate.get("error_a3") + str(e)
+    )
 
 def save_file(event=None):
     try:
@@ -1127,6 +1302,12 @@ def save_file(event=None):
     elif language == "cpp":
         ext = ".cpp"
         filetypes = [(translate.get("cpp_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
+    elif language == "markdown":
+        ext = ".md"
+        filetypes = [(translate.get("markdown_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
+    elif language == "renpy":
+        ext = ".rpy"
+        filetypes = [(translate.get("renpy_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
     else:
         ext = ".txt"
         filetypes = [(translate.get("text_files"), "*.txt"), (translate.get("all_files"), "*.*")]
@@ -1156,6 +1337,10 @@ def get_language(file_path):
         return 'cs'
     elif file_path.endswith('.css'):
         return 'css'
+    elif file_path.endswith('.md') or file_path.endswith('.markdown'):
+        return 'markdown'
+    elif file_path.endswith('.rpy'):
+        return 'renpy'
     else:
         return 'plaintext'
     
@@ -1193,6 +1378,21 @@ def highlight_line(event=None, targ=None):
 def highlight_full_document():
     highlight(full_document=True)
     bind_tooltips()
+    
+def highlight_visible(target=None):
+    if target is None:
+        target = text
+    first = target.index("@0,0")
+    last = target.index(f"@0,{target.winfo_height()}")
+    first_line = int(first.split('.')[0])
+    last_line = int(last.split('.')[0])
+    for line in range(first_line, last_line + 1):
+        region_start = f"{line}.0"
+        region_end = f"{line}.end"
+        content = target.get(region_start, region_end)
+        for tag in target.tag_names():
+            target.tag_remove(tag, region_start, region_end)
+        highlight(target=target, region_start=region_start, region_end=region_end, content=content)
     
 def mask_comments(content, comment_spans):
     chars = list(content)
@@ -1243,7 +1443,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
         return any(s <= idx < e for s, e in string_spans)
 
     # --- Comments ---
-    if language == "python":
+    if language in ("python", "renpy"):
         lines = content.split('\n')
         current_pos = 0
         for line in lines:
@@ -1278,7 +1478,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
                 comment_spans.append((s, e))
                 target.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
         
-    elif language == "html":
+    elif language in ("html", "markdown"):
         for match in re.finditer(r'<!--.*?-->', content, re.DOTALL):
             s, e = match.start(), match.end()
             comment_spans.append((s, e))
@@ -1333,20 +1533,47 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             target.tag_add("constant", f"{region_start}+{s}c", f"{region_start}+{e}c")
            
     # --- Strings ---
-    for match in re.finditer(r'("""(?:.|\n)*?"""|\'\'\'(?:.|\n)*?\'\'\'|"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', masked_content):
-        s, e = match.start(), match.end()
-        string_spans.append((s, e))
-        target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
-        escape_pattern = r'\\ |\\(\\|[abfnrtv\'"0-9xuU])'
-        for s, e in string_spans:
-            string_text = content[s:e]
-            for esc in re.finditer(escape_pattern, string_text):
-                esc_start = s + esc.start()
-                esc_end = s + esc.end()
-                target.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
-                
+    if language != "markdown":
+        for match in re.finditer(r'("""(?:.|\n)*?"""|\'\'\'(?:.|\n)*?\'\'\'|"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', masked_content):
+            s, e = match.start(), match.end()
+            string_spans.append((s, e))
+            target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+            escape_pattern = r'\\ |\\(\\|[abfnrtv\'"0-9xuU])'
+            for s, e in string_spans:
+                string_text = content[s:e]
+                for esc in re.finditer(escape_pattern, string_text):
+                    esc_start = s + esc.start()
+                    esc_end = s + esc.end()
+                    target.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
+                 
+    if language == "markdown":
+        # --- Headings ---
+        for match in re.finditer(r'^(#{1,6})\s.*$', content, re.MULTILINE):
+            s, e = match.start(1), match.end(1)
+            target.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
+ 
+        # --- Blockquotes ---
+        for match in re.finditer(r'^(>\s)', content, re.MULTILINE):
+            s, e = match.start(1), match.end(1)
+            target.tag_add("comment", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Lists ---
+        for match in re.finditer(r'^(\s*[-*+])\s', content, re.MULTILINE):
+            s, e = match.start(1), match.end(1)
+            target.tag_add("keyword", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Inline Code (``) ---
+        for match in re.finditer(r'`[^`]+`', content):
+            s, e = match.start(), match.end()
+            target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
+        # --- Fenced Code Blocks (```) ---
+        for match in re.finditer(r'``````', content, re.DOTALL):
+            s, e = match.start(), match.end()
+            target.tag_add("preprocessor", f"{region_start}+{s}c", f"{region_start}+{e}c")
+
     # --- Operators ---       
-    if language in ("cpp", "python", "javascript", "cs", "css"):
+    if language in ("cpp", "python", "renpy", "javascript", "cs", "css"):
         operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
         for match in re.finditer(operator_pattern, content):
             s, e = match.start(), match.end()
@@ -1354,7 +1581,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
                 target.tag_add("operator", f"{region_start}+{s}c", f"{region_start}+{e}c")
                 
     # --- Builtins ---
-    if language == "python":
+    if language in ("python", "renpy"):
         builtins = LANGUAGE_FUNCS.get(language, set())
         if builtins:
             for match in re.finditer(r"\b(" + "|".join(map(re.escape, builtins)) + r")\b", content):
@@ -1431,60 +1658,100 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
         if not is_in_string_or_comment(s):
             target.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
             
-    # --- f-strings (Python, C# for $"{}") ---
-    if language == "python" or language == "cs":
-        for f_match in re.finditer(r'(?P<prefix>[fFrR|\$]{1,2})(?P<quote>["\'])(?P<body>.*?)(?P=quote)', content, re.DOTALL):
+    # --- f-strings (Python, Ren'Py for "[]" and C# for $"{}") ---
+    if language in ("python", "renpy", "cs"):
+        if language == "python":
+            string_pattern = r'(?P<prefix>[fFrR]{1,2})?(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+        elif language == "renpy":
+            string_pattern = r'(?P<prefix>[fFrR]{1,2})?(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+        elif language == "cs":
+            string_pattern = r'(?P<prefix>[\$]{1,2})?(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+        for f_match in re.finditer(string_pattern, content, re.DOTALL):
             if is_in_string_or_comment(f_match.start()):
                 continue
-            prefix_start = f_match.start('prefix')
+  
+            prefix = f_match.group('prefix') or ''
+            quote = f_match.group('quote')
+            body = f_match.group('body')
+
+            prefix_start = f_match.start('prefix') if prefix else f_match.start('quote')
             quote_end = f_match.end('quote')
             body_start = f_match.start('body')
             body_end = f_match.end('body')
+
             string_spans.append((prefix_start, quote_end))
             target.tag_add("string", f"{region_start}+{prefix_start}c", f"{region_start}+{quote_end}c")
-            target.tag_add("prefix", f"{region_start}+{prefix_start}c", f"{region_start}+{f_match.end('prefix')}c")
-            body = f_match.group('body')
+            if prefix:
+                target.tag_add("prefix", f"{region_start}+{prefix_start}c", f"{region_start}+{f_match.end('prefix')}c")
+
             current_pos = body_start
-            for part in re.finditer(r'(.*?)(\{.*?\}|$)', body):
+
+            if language == "renpy":
+                interpolation_pattern = r'(\[.*?\]|\{.*?\})'
+            elif language == "python":
+                if 'f' not in prefix.lower():
+                    continue
+                interpolation_pattern = r'(\{.*?\})'
+            elif language == "cs":
+                if '$' not in prefix:
+                    continue
+                interpolation_pattern = r'(\{.*?\})'
+            else:
+                interpolation_pattern = ''
+
+            if not interpolation_pattern:
+                continue
+
+            for part in re.finditer(r'(.*?)(%s|$)' % interpolation_pattern, body):
                 literal = part.group(1)
                 expr = part.group(2)
+
                 if literal:
                     lit_start = current_pos
                     lit_end = lit_start + len(literal)
                     string_spans.append((lit_start, lit_end))
                     target.tag_add("string", f"{region_start}+{lit_start}c", f"{region_start}+{lit_end}c")
                     current_pos = lit_end
-                if expr and expr.startswith('{'):
+    
+                if expr and expr[0] in ('{', '['):
                     expr_start = current_pos
                     expr_end = current_pos + len(expr)
                     current_pos = expr_end
+    
                     target.tag_remove("string", f"{region_start}+{expr_start}c", f"{region_start}+{expr_end}c")
                     inner_text = expr[1:-1]
                     inner_start = expr_start + 1
+    
                     for str_match in re.finditer(r"(['\"])(?:\\.|[^\\])*?\1", inner_text):
                         s = inner_start + str_match.start()
                         e = inner_start + str_match.end()
                         target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
+    
                     for func_match in re.finditer(r'\b([a-zA-Z_]\w*)\s*\(', inner_text):
                         f_start = inner_start + func_match.start(1)
                         f_end = inner_start + func_match.end(1)
                         target.tag_add("funccall", f"{region_start}+{f_start}c", f"{region_start}+{f_end}c")
+   
                     target.tag_add("punctuation", f"{region_start}+{expr_start}c", f"{region_start}+{expr_start+1}c")
                     target.tag_add("punctuation", f"{region_start}+{expr_end-1}c", f"{region_start}+{expr_end}c")
+  
                     for var_match in re.finditer(r'\b([a-zA-Z_]\w*)\b', inner_text):
                         v_start = inner_start + var_match.start(1)
                         v_end = inner_start + var_match.end(1)
                         if not any(target.tag_names(f"{region_start}+{v_start}c")):
                             target.tag_add("variable", f"{region_start}+{v_start}c", f"{region_start}+{v_end}c")
+
                     for num_match in re.finditer(r'\b\d+\b', inner_text):
                         n_start = inner_start + num_match.start()
                         n_end = inner_start + num_match.end()
                         target.tag_add("number", f"{region_start}+{n_start}c", f"{region_start}+{n_end}c")
+
                     for dunder_match in re.finditer(r'\b(__\w+__)\b', inner_text):
                         d_start = inner_start + dunder_match.start()
                         d_end = inner_start + dunder_match.end()
                         target.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
-                    if language in ("cpp", "python", "javascript", "cs"):
+
+                    if language in ("cpp", "python", "renpy", "javascript", "cs"):
                         operator_pattern = r'(<<=|>>=|->\*|->|&&|\|\||\+\+|\-\-|<=|>=|==|<<|>>|!=|\.\*|\+=|-=|\*=|/=|%=|\^=|\|=|&=|::|:|\?|\.|~|\+|\-|\*|/|%|<|>|\^|\|)'
                         for operator_match in re.finditer(operator_pattern, inner_text):
                             o_start = inner_start + operator_match.start()
@@ -1499,7 +1766,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
                 tag_end = f"{region_start}+{match.end()}c"
                 target.tag_add("keyword", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
                 target.tag_add(f"kw_{match.group(0)}", tag_start, tag_end)
-    if language in ("python", "cs", "cpp", "javascript"):
+    if language in ("python", "renpy", "cs", "cpp", "javascript"):
         for match in re.finditer(r'\bclass\s+([A-Za-z_][A-Za-z0-9_]*)', content):
             name_start = match.start(1)
             name_end = match.end(1)
@@ -1521,7 +1788,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             target.tag_add("variable", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
     
     # --- Tooltips ---
-    if language == "python":
+    if language in ("python", "renpy"):
         for match in re.finditer(
         r'\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(?:->\s*([^:]+?))?:', content
         ):
@@ -1559,7 +1826,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             target.tag_add("string", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
     # --- Constants (ALLCAPS) ---
-    if language in ['python', 'javascript', 'cpp']:
+    if language in ['python', 'renpy', 'javascript', 'cpp']:
         for match in re.finditer(r'\b([A-Z][A-Z0-9_]*[A-Z][A-Z0-9_]*)\b', content):
             if not is_in_string_or_comment(match.start()):
                 target.tag_add("constant", f"{region_start}+{match.start(1)}c", f"{region_start}+{match.end(1)}c")
@@ -1621,9 +1888,18 @@ themes = {
         'variable': '#ffffff', 'builtin': "#43d9ad", 'dunder': '#b362ff', 'pointer': "#a599e9", 'classname': "#fcbf6b",
         'escape': '#b362ff', 'semicolon': "#a599e9", 'preprocessor': "#f97e72", 'preprocessor_rest': "#22223b",
         'html_tag': "#a599e9", 'html_attr': "#43d9ad", 'constant': "#fcbf6b", 'template': "#43d9ad", 'operator': "#a599e9",
-    }
-}
+    },
+    'high_contrast': {
+    'bg': '#000000', 'fg': '#FFFFFF',
+    'keyword': '#00FFFF', 'string': "#FF4000", 'comment': '#FFFF00',
+    'function': '#00FF00', 'funccall': '#00FFFF', 'integer': '#FFA500', 'member': '#FF4500',
+    'prefix': '#00FFFF', 'line_numbers': '#333333', 'cursor': '#FFFFFF', 'type': '#00FF00',
+    'variable': '#FFFFFF', 'builtin': '#FF4500', 'dunder': '#AAAAAA', 'pointer': '#00FFFF', 'classname': '#00FF00',
+    'escape': '#FF0000', 'semicolon': '#FFFFFF', 'preprocessor': "#C800C8", 'preprocessor_rest': '#AAAAAA',
+    'html_tag': '#00FFFF', 'html_attr': '#FFA500', 'constant': '#FF4500', 'template': '#00FF00', 'operator': '#FFFF00',
+},
 
+}
         
 def auto_indent(event):
     text = event.widget
@@ -1794,6 +2070,16 @@ scrollbar = tk.Scrollbar(sidebar, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=scrollbar.set)
 scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+def synced_scroll(first, last):
+    text.yview_moveto(first)
+    line_numbers.yview_moveto(first)
+    scrollbar.set(first, last)
+
+    update_line_numbers()
+    
+text.config(yscrollcommand=lambda *args: synced_scroll(*args))
+line_numbers.config(yscrollcommand=lambda *args: synced_scroll(*args))
+
 def open_selected_file(event=None):
     sel = file_listbox.curselection()
     if sel:
@@ -1860,7 +2146,7 @@ def open_folder(folder=None, skip_ask=False):
         folder = filedialog.askdirectory()
     if folder:
         tree.delete(*tree.get_children())
-        root_node = tree.insert("", "end", text=folder, open=True)
+        root_node = tree.insert("", "end", text=os.path.basename(folder) + f" ({folder})", open=True, values=[folder])
         insert_nodes(root_node, folder)
         new_file()
         file_listbox.folder_path = folder
@@ -2179,7 +2465,31 @@ def on_key_release(event=None):
     else:
         highlight_job = root.after(debounce_delay, highlight_line)
     update_line_numbers()
-                
+    
+def clean_temp_files():
+    temp_dir = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "tempsave")
+    if os.path.exists(temp_dir):
+        for filename in os.listdir(temp_dir):
+            file_path = os.path.join(temp_dir, filename)
+            print(file_path)
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                pass
+            
+is_fullscreen = False
+
+def toggle_fullscreen():
+    global is_fullscreen
+    is_fullscreen = not is_fullscreen
+    root.attributes("-fullscreen", is_fullscreen)
+
+def exit_fullscreen():
+    global is_fullscreen
+    is_fullscreen = False
+    root.attributes("-fullscreen", False)
+
 text.unbind("<KeyRelease>")
 text.bind('<KeyRelease>', lambda e: (on_key_release(), sync_scroll()))
 text.bind('<MouseWheel>', lambda e: sync_scroll())
@@ -2198,12 +2508,24 @@ text.bind("<Control-l>", hide_sidebar)
 text.bind("<Control-r>", run_code)
 text.bind("<Control-f>", find_text)
 text.bind("<Control-n>", new_file)
+text.bind("<Control-t>", clean_temp_files)
+text.bind("<F11>", toggle_fullscreen)
+root.bind("<Escape>", exit_fullscreen)
 root.bind("<Control-minus>", zoom_out)
 root.bind("<Control-underscore>", zoom_out)
 root.bind("<Control-equal>", zoom_in)
 root.bind("<Control-plus>", zoom_in)
 
 update_line_numbers()
+
+def show_complete_sidebar():
+    show_sidebar()
+    show_minimap()
+def hide_complete_sidebar():
+    hide_sidebar()
+    hide_minimap()
+    
+save_new_file = tk.BooleanVar(value=True)
 
 def set_ui():
     global file_menu, edit_menu, theme_menu, view_menu, run_menu, language_menu, guilang_menu
@@ -2216,6 +2538,9 @@ def set_ui():
     file_menu.add_command(label=translate.get("open"), command=open_file, accelerator="Ctrl+O")
     file_menu.add_command(label=translate.get("open_folder"), command=open_folder, accelerator="Ctrl+Shift+D")
     file_menu.add_command(label=translate.get("save"), command=save_file, accelerator="Ctrl+S")
+    file_menu.add_separator()
+    file_menu.add_checkbutton(label=translate.get("toggle_new_file_saving"), variable=save_new_file, onvalue=True, offvalue=False)
+    file_menu.add_command(label=translate.get("clean_temp_files"), command=clean_temp_files, accelerator="Ctrl+T")
     file_menu.add_separator()
     file_menu.add_command(label=translate.get("exit"), command=root.quit)
 
@@ -2234,16 +2559,20 @@ def set_ui():
     theme_menu.add_command(label=translate.get("theme_monokai"), command=lambda: set_theme('monokai'))
     theme_menu.add_command(label=translate.get("theme_night_owl"), command=lambda: set_theme('night_owl'))
     theme_menu.add_command(label=translate.get("theme_shades_of_purple"), command=lambda: set_theme('shades_of_purple'))
+    theme_menu.add_command(label=translate.get("theme_high_contrast"), command=lambda: set_theme('high_contrast'))
 
     menu.add_cascade(label=translate.get("view"), menu=view_menu)
     view_index = menu.index(tk.END)
     view_menu.add_command(label=translate.get("zoom_in"), command=zoom_in, accelerator="Ctrl++")
     view_menu.add_command(label=translate.get("zoom_out"), command=zoom_out, accelerator="Ctrl+-")
     view_menu.add_separator()
-    view_menu.add_command(label=translate.get("show_sidebar"), command=show_sidebar, accelerator="Ctrl+J")
-    view_menu.add_command(label=translate.get("hide_sidebar"), command=hide_sidebar, accelerator="Ctrl+L")
+    view_menu.add_command(label=translate.get("show_sidebar"), command=show_complete_sidebar, accelerator="Ctrl+J")
+    view_menu.add_command(label=translate.get("hide_sidebar"), command=hide_complete_sidebar, accelerator="Ctrl+L")
     view_menu.add_command(label=translate.get("show_minimap"), command=show_minimap, accelerator="Ctrl+Shift+H")
     view_menu.add_command(label=translate.get("hide_minimap"), command=hide_minimap, accelerator="Ctrl+K")
+    view_menu.add_separator()
+    view_menu.add_command(label=translate.get("toggle_fullscreen"), command=toggle_fullscreen)
+    view_menu.add_command(label=translate.get("exit_fullscreen"), command=exit_fullscreen)
 
     menu.add_cascade(label=translate.get("run"), menu=run_menu)
     run_index = menu.index(tk.END)
@@ -2258,6 +2587,9 @@ def set_ui():
     language_menu.add_radiobutton(label=translate.get("html"), variable=language_var, value='html', command=highlight_language_change)
     language_menu.add_radiobutton(label=translate.get("cpp"), variable=language_var, value='cpp', command=highlight_language_change)
     language_menu.add_radiobutton(label=translate.get("cs"), variable=language_var, value='cs', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("markdown"), variable=language_var, value='markdown', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("renpy"), variable=language_var, value='renpy', command=highlight_language_change)
+
 
     menu.add_cascade(label=translate.get("gui_lang"), menu=guilang_menu)
     guilang_index = menu.index(tk.END)
@@ -2271,13 +2603,47 @@ def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
     os.makedirs(config_dir, exist_ok=True)
     config_file = os.path.join(config_dir, 'session.json')
+
     session = {
-        'file': current_file if os.path.exists(current_file) else "",
-        'directory': globals()['FOLDER'] if globals()['FOLDER'] != "" else "",
+        'file': "",
+        'directory': globals().get('FOLDER', ""),
         'theme': current_theme,
         'language': language_var.get(),
-        'guilang': translate.lang
+        'guilang': translate.lang,
+        'save_new_file': save_new_file.get()
     }
+
+    if not current_file or not os.path.exists(current_file):
+        if save_new_file.get():
+            content = text.get(1.0, tk.END).rstrip('\n')
+            if not content:
+                with open(config_file, 'w') as f:
+                    json.dump(session, f, indent=2)
+                return
+
+            ext = guess_language_from_content(content).replace('python', 'py').replace('javascript', 'js') \
+                .replace('markdown', 'md').replace('renpy', 'rpy').replace('plaintext', 'txt')
+            os.makedirs(os.path.join(os.getenv("USERPROFILE"), ".slashcode", "tempsave"), exist_ok=True)
+            slashcode_file_dir = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "tempsave")
+            for i in range(10):
+                file_name = f"file_{i}.{ext}"
+                slashcode_path = os.path.join(slashcode_file_dir, file_name)
+                if not os.path.exists(slashcode_path):
+                    break
+            else:
+                rand_str = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(7))
+                file_name = f"file_{rand_str}.{ext}"
+                slashcode_path = os.path.join(slashcode_file_dir, file_name)
+
+            with open(slashcode_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+                print(slashcode_path)
+
+            session['file'] = slashcode_path
+
+    else:
+        session['file'] = current_file
+
     with open(config_file, 'w') as f:
         json.dump(session, f, indent=2)
 
@@ -2299,13 +2665,15 @@ def load_session():
     return {}
 
 session = load_session()
+try:
+    print(f"Loaded session: {session}\n\nFile: {session['file']}")
+except:
+    pass
 if session.get('file'):
     try:
         with open(session['file'], 'r', encoding='utf-8') as f:
-            text.delete(1.0, tk.END)
-            text.insert(tk.END, f.read())
-            root.title(f"Slash Code - {os.path.basename(session['file'])}")
-            current_file = session['file']
+            content = f.read()
+        root.after(0, update_gui, session['file'], content)
     except Exception as e:
         print(translate.get("error_b1") + f"{e}")
         
@@ -2324,6 +2692,8 @@ if session.get('language'):
 if session.get('guilang'):
     lang_var.set(session['guilang'])
     on_lang_change()
+if session.get('save_new_file'):
+    save_new_file.set(save_new_file.get())
 highlight_full_document()
 
 
