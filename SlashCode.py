@@ -570,8 +570,9 @@ def update_ui_text():
         file_menu.entryconfig(1, label=translate.get("open"))
         file_menu.entryconfig(2, label=translate.get("open_folder"))
         file_menu.entryconfig(3, label=translate.get("save"))
-        file_menu.entryconfig(5, label=translate.get("clean_temp_files"))
-        file_menu.entryconfig(6, label=translate.get("exit"))
+        file_menu.entryconfig(5, label=translate.get("toggle_new_file_saving"))
+        file_menu.entryconfig(6, label=translate.get("clean_temp_files"))
+        file_menu.entryconfig(7, label=translate.get("exit"))
     except Exception as e:
         print(translate.get("error_c2"), e)
 
