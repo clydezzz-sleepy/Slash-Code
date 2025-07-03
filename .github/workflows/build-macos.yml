@@ -23,7 +23,7 @@ jobs:
 
       - name: Build .app
         run: |
-          python3 setup.py py2app
+          python3 macos-setup.py py2app
 
       - name: Upload .app as artifact
         uses: actions/upload-artifact@v4
