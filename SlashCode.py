@@ -2011,7 +2011,7 @@ current_theme = 'light'
 theme_var = tk.StringVar(value=current_theme)
 
 line_numbers.pack(side=tk.LEFT, fill=tk.Y)
-text = scrolledtext.ScrolledText(frame, font=font, undo=True)
+text = scrolledtext.ScrolledText(frame, font=font, undo=True, wrap=tk.WORD)
 text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 text.bind("<Return>", auto_indent)
 text.bind("}", handle_closing_brace)
@@ -2040,9 +2040,11 @@ def highlight_minimap():
     minimap.config(state='disabled')
 
 def hide_minimap():
+    minimap_frame.place_forget()
     minimap.pack_forget()
     
 def show_minimap():
+    minimap_frame.place(relx=0.9905, rely=0.5575, anchor="ne")
     minimap.pack(fill=tk.Y, expand=True)
     
 def update_minimap(event=None):
@@ -2465,7 +2467,8 @@ def run_code():
             with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
                 f.write(code)
                 f.flush()
-                webbrowser.open(f.name)
+                file_url = "file://" + os.path.abspath(f.name)
+                webbrowser.open_new_tab(file_url)
             output = translate.get("opened_in_browser")
 
         else:
