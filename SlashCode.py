@@ -595,7 +595,7 @@ def update_ui_text():
         file_menu.entryconfig(3, label=translate.get("save"))
         file_menu.entryconfig(5, label=translate.get("toggle_new_file_saving"))
         file_menu.entryconfig(6, label=translate.get("clean_temp_files"))
-        file_menu.entryconfig(7, label=translate.get("exit"))
+        file_menu.entryconfig(8, label=translate.get("exit"))
     except Exception as e:
         print(translate.get("error_c2"), e)
 
@@ -2757,3 +2757,4 @@ root.after(100, update_minimap)
 update_line_numbers()
             
 root.mainloop()
+
