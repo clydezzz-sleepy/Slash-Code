@@ -492,8 +492,8 @@ file_index = edit_index = theme_index = view_index = run_index = language_index 
 
 def highlight_language_change():
     print(translate.get("highlighting_as") + f"{language_var.get()}")
-    if os.path.getsize(current_file) > 200_000:
-            root.after(150, highlight_full_document)
+    if os.path.getsize(current_file) > 80000:
+        root.after(150, lambda: highlight_document_in_chunks(chunk_size=100))
     else:
         root.after(10, highlight_full_document)
 
@@ -640,7 +640,7 @@ def create_sidebar_buttons():
     open_folder_btn = tk.Button(
         sidebar,
         text=translate.get("open_folder"),
-        command=open_folder,
+        command=lambda: None,
         bg=themes[theme_var.get()]['bg'],
         fg=themes[theme_var.get()]['fg']
     )
@@ -1216,12 +1216,42 @@ TOOLTIP_INFO = {
   }
 }
 
+def highlight_document_in_chunks(chunk_size=100):
+    last_line = int(text.index(tk.END).split('.')[0]) - 1
+
+    def highlight_chunk(start_line=1):
+        end_line = min(start_line + chunk_size - 1, last_line)
+        for line in range(start_line, end_line + 1):
+            region_start = f"{line}.0"
+            region_end = f"{line}.end"
+            content = text.get(region_start, region_end)
+            for tag in text.tag_names():
+                text.tag_remove(tag, region_start, region_end)
+            highlight(target=text, region_start=region_start, region_end=region_end, content=content)
+        if end_line < last_line:
+            root.after(10, lambda: highlight_chunk(end_line + 1))
+
+    highlight_chunk()
+
 current_file = ""
 
 def new_file(event=None):
     text.delete(1.0, tk.END)
     update_line_numbers()
     root.title("Slash Code")
+
+def load_file(path):
+    def worker():
+        try:
+            file_size = os.path.getsize(path)
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            root.after(0, lambda: update_gui(path, content, file_size))
+        except Exception as e:
+            root.after(0, show_error, e)
+
+    threading.Thread(target=worker, daemon=True).start()
 
 def open_file(event=None):
     global current_file
@@ -1243,21 +1273,9 @@ def open_file(event=None):
     
     if file_path:
         current_file = file_path
-        threading.Thread(
-            target=read_file_thread, 
-            args=(file_path,),
-            daemon=True
-        ).start()
+        load_file(file_path)
 
-def read_file_thread(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        root.after(0, update_gui, file_path, content)
-    except Exception as e:
-        root.after(0, show_error, e)
-
-def update_gui(file_path, content):
+def update_gui(file_path, content, file_size=None):
     text.delete(1.0, tk.END)
     text.insert(tk.END, content)
     text.edit_separator()
@@ -1267,7 +1285,11 @@ def update_gui(file_path, content):
         lang = guess_language_from_content(content)
     language_var.set(lang)
     update_line_numbers()
-    highlight_full_document()
+    if file_size is not None and file_size > 80000:
+        root.after(150, lambda: highlight_document_in_chunks(chunk_size=100))
+    else:
+        root.after(10, highlight_full_document)
+
 
 def show_error(e):
     messagebox.showerror(
@@ -1379,21 +1401,6 @@ def highlight_line(event=None, targ=None):
 def highlight_full_document():
     highlight(full_document=True)
     bind_tooltips()
-    
-def highlight_visible(target=None):
-    if target is None:
-        target = text
-    first = target.index("@0,0")
-    last = target.index(f"@0,{target.winfo_height()}")
-    first_line = int(first.split('.')[0])
-    last_line = int(last.split('.')[0])
-    for line in range(first_line, last_line + 1):
-        region_start = f"{line}.0"
-        region_end = f"{line}.end"
-        content = target.get(region_start, region_end)
-        for tag in target.tag_names():
-            target.tag_remove(tag, region_start, region_end)
-        highlight(target=target, region_start=region_start, region_end=region_end, content=content)
     
 def mask_comments(content, comment_spans):
     chars = list(content)
@@ -1945,7 +1952,10 @@ def undo_action(event=None):
 def redo_action(event=None):
     try:
         text.edit_redo()
-        highlight_full_document()
+        if os.path.getsize(current_file) > 80000:
+            root.after(100, lambda: highlight_document_in_chunks(chunk_size=100))
+        else:
+            root.after(50, highlight_full_document)
     except tk.TclError:
         pass
 
@@ -1957,6 +1967,7 @@ if lang_var.get() == "jp":
     font = ("NSJP.ttf", font_size)
 else:
     font = ("Consolas", font_size)
+
 line_numbers = tk.Text(
     frame,
     font=font,
@@ -1966,8 +1977,7 @@ line_numbers = tk.Text(
     border=0,
     background='#f0f0f0',
     state='disabled',
-    wrap='none',
-    yscrollcommand=lambda *args: None  # Disable own scroll
+    wrap='none'
 )
 
 current_theme = 'light'
@@ -1980,11 +1990,11 @@ text.bind("<Return>", auto_indent)
 text.bind("}", handle_closing_brace)
 
 minimap_frame = tk.Frame(root, width=0, bg=themes[theme_var.get()]['bg'])
-minimap_frame.place(relx=0.99065, rely=0.515, anchor="ne")
+minimap_frame.place(relx=0.9905, rely=0.5575, anchor="ne")
 minimap_font = tk.font.Font(family="Consolas", size=4)
 def set_minimap():
     global minimap
-    minimap = tk.Text(minimap_frame, font=minimap_font, width=62, height=78, state='disabled', bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'])
+    minimap = tk.Text(minimap_frame, font=minimap_font, width=62, height=60, state='disabled', bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'])
 set_minimap()
 minimap.pack(fill=tk.Y, expand=True)
 
@@ -2002,7 +2012,6 @@ def highlight_minimap():
     highlight(target=minimap, content=content)
     minimap.config(state='disabled')
 
-
 def hide_minimap():
     minimap.pack_forget()
     
@@ -2018,11 +2027,47 @@ def update_minimap(event=None):
     minimap.insert('1.0', text.get('1.0', tk.END))
     minimap.config(state='disabled')
     
-def sync_scroll(*args):
-    text.yview_moveto(text.yview()[0])
+def on_text_scroll(*args):
+    line_numbers.yview_moveto(text.yview()[0])
     minimap.yview_moveto(text.yview()[0])
+    text.vbar.set(*args)
 
-text.bind('<<Modified>>', lambda e: (update_minimap(), text.edit_modified(0)))
+text.config(yscrollcommand=on_text_scroll)
+
+def on_scroll(event=None):
+    line_numbers.yview_moveto(text.yview()[0])
+    minimap.yview_moveto(text.yview()[0])
+    update_line_numbers()
+    return None
+
+def on_key_and_scroll(event=None):
+    line_numbers.yview_moveto(text.yview()[0])
+    minimap.yview_moveto(text.yview()[0])
+    update_line_numbers()
+    return None
+
+def on_minimap_click(event):
+    height = minimap.winfo_height()
+    clicked_fraction = event.y / height
+    text.yview_moveto(clicked_fraction)
+    update_minimap()
+
+minimap.bind("<Button-1>", on_minimap_click)
+text.bind("<MouseWheel>", on_scroll)
+text.bind("<Button-4>", on_scroll)
+text.bind("<Button-5>", on_scroll)
+
+sidebar = tk.Frame(frame, width=200, bg=themes[theme_var.get()]['bg'])
+sidebar.pack(side=tk.RIGHT, fill=tk.Y)
+
+create_sidebar_buttons()
+
+tree = ttk.Treeview(sidebar)
+tree.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+
+scrollbar = tk.Scrollbar(sidebar, orient="vertical", command=tree.yview)
+tree.configure(yscrollcommand=scrollbar.set)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
 def zoom_in(event=None):
     global font_size, font
@@ -2040,46 +2085,28 @@ def zoom_out(event=None):
     line_numbers.config(font=font)
     update_line_numbers()
 
-def sync_scroll(event=None):
-    line_numbers.yview_moveto(text.yview()[0])
-    minimap.yview_moveto(text.yview()[0])
-    line_numbers.config(yscrollcommand=lambda *args: None)
-    
-def on_scroll(event):
-    sync_scroll(event)
+text.bind('<<Modified>>', lambda e: (update_minimap(), text.edit_modified(0)))
+
+def on_key_and_scroll(event=None):
+    on_key_release()
+    on_scroll()
+    return None
+
+def on_mousewheel(event=None):
+    on_scroll()
+    return None
+
+def on_button_release(event=None):
+    on_scroll()
+    return None
+
+def on_configure(event=None):
     update_line_numbers()
-    
-def on_minimap_click(event):
-    height = minimap.winfo_height()
-    clicked_fraction = event.y / height
-    text.yview_moveto(clicked_fraction)
-    update_minimap()
-    
-minimap.bind("<Button-1>", on_minimap_click)
-text.bind("<MouseWheel>", on_scroll)
+    return None
 
-text.bind("<Button-4>", on_scroll)
-text.bind("<Button-5>", on_scroll)
-
-sidebar = tk.Frame(frame, width=200, bg=themes[theme_var.get()]['bg'])
-sidebar.pack(side=tk.RIGHT, fill=tk.Y)
-
-tree = ttk.Treeview(sidebar)
-tree.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-
-scrollbar = tk.Scrollbar(sidebar, orient="vertical", command=tree.yview)
-tree.configure(yscrollcommand=scrollbar.set)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-def synced_scroll(first, last):
-    text.yview_moveto(first)
-    line_numbers.yview_moveto(first)
-    scrollbar.set(first, last)
-
-    update_line_numbers()
-    
-text.config(yscrollcommand=lambda *args: synced_scroll(*args))
-line_numbers.config(yscrollcommand=lambda *args: synced_scroll(*args))
+def on_paste(event=None):
+    root.after(10, highlight_full_document)
+    return None
 
 def open_selected_file(event=None):
     sel = file_listbox.curselection()
@@ -2092,7 +2119,10 @@ def open_selected_file(event=None):
                 with open(fpath, "r", encoding="utf-8") as f:
                     text.delete("1.0", tk.END)
                     text.insert(tk.END, f.read())
-                highlight_full_document()
+                if os.path.getsize(fpath) > 80000:
+                     root.after(150, lambda: highlight_document_in_chunks(chunk_size=100))
+                else:
+                    root.after(10, highlight_full_document)
             except Exception as e:
                 messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
 
@@ -2105,42 +2135,34 @@ def insert_nodes(parent, path):
         for name in sorted(os.listdir(path)):
             abspath = os.path.join(path, name)
             isdir = os.path.isdir(abspath)
-            node = tree.insert(parent, "end", text=name, open=False)
+            node = tree.insert(parent, "end", text=name, open=False, values=[abspath])
             if isdir:
-                tree.insert(node, "end")
+                tree.insert(node, "end")  # Dummy child
     except Exception:
         pass
 
 def get_full_path(node):
-    path = ""
-    while node:
-        name = tree.item(node, "text")
-        path = os.path.join(name, path) if path else name
-        node = tree.parent(node)
-    return os.path.abspath(path)
+    return tree.item(node, "values")[0] if tree.item(node, "values") else ""
+
+def on_open_node(event):
+    node = tree.focus()
+    path = get_full_path(node)
+    children = tree.get_children(node)
+    if children:
+        first_child = children[0]
+        if not tree.item(first_child, "values"):
+            tree.delete(first_child)
+            insert_nodes(node, path)
 
 def on_tree_double_click(event=None):
     node = tree.focus()
     path = get_full_path(node)
     if os.path.isfile(path):
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                code = f.read()
-                text.delete(1.0, tk.END)
-                text.insert(tk.END, code)
-                root.title(f"Slash Code - {os.path.basename(path)}")
-                lang = get_language(path)
-                if lang == 'plaintext':
-                    lang = guess_language_from_content(code)
-                language_var.set(lang)
-                globals()['current_file'] = path
-                update_line_numbers()
-                highlight_full_document()
-                highlight(target=minimap)
+            load_file(path)
+            highlight(target=minimap)
         except Exception as e:
             messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
-        
-tree.bind("<Double-1>", on_tree_double_click)
 
 def open_folder(folder=None, skip_ask=False):
     if not folder and not skip_ask:
@@ -2153,18 +2175,21 @@ def open_folder(folder=None, skip_ask=False):
         file_listbox.folder_path = folder
         globals()['FOLDER'] = folder
 
+open_folder_btn.config(command=open_folder)
+
 def on_open_node(event):
     node = tree.focus()
     path = get_full_path(node)
-    if tree.get_children(node):
-        first_child = tree.get_children(node)[0]
-        if not tree.get_children(first_child):
+    children = tree.get_children(node)
+    if children:
+        first_child = children[0]
+        if not tree.item(first_child, "values"):
             tree.delete(first_child)
             insert_nodes(node, path)
 
 tree.bind("<<TreeviewOpen>>", on_open_node)
+tree.bind("<Double-1>", on_tree_double_click)
 
-create_sidebar_buttons()
 update_ui_text()
 
 def set_theme(theme_name):
@@ -2445,14 +2470,15 @@ def hide_sidebar():
     sidebar_visible[0] = False
 
 def update_line_numbers(event=None):
-    if text.edit_modified():
-        line_numbers.config(state='normal')
-        line_numbers.delete('1.0', tk.END)
-        row_count = int(text.index('end-1c').split('.')[0])
-        line_numbers.config(width=len(str(row_count)) + 1)
-        line_numbers.insert('1.0', '\n'.join(str(i) for i in range(1, row_count + 1)))
-        line_numbers.config(state='disabled')
-    text.edit_modified(False)
+    line_numbers.config(state='normal')
+    line_numbers.delete('1.0', tk.END)
+    row_count = int(text.index('end-1c').split('.')[0])
+    row_count = max(1, row_count)
+    line_numbers.config(width=len(str(row_count)) + 1)
+    line_numbers.insert('1.0', '\n'.join(str(i) for i in range(1, row_count + 1)))
+    line_numbers.config(state='disabled')
+    if event is not None:
+        text.edit_modified(False)
     
 highlight_job = None
 debounce_delay = 300
@@ -2461,7 +2487,7 @@ def on_key_release(event=None):
     if highlight_job is not None:
         root.after_cancel(highlight_job)
     content_size = len(text.get("1.0", tk.END))
-    if content_size < 5000:
+    if content_size < 10000:
         highlight_job = root.after(debounce_delay, highlight_full_document)
     else:
         highlight_job = root.after(debounce_delay, highlight_line)
@@ -2491,14 +2517,13 @@ def exit_fullscreen():
     is_fullscreen = False
     root.attributes("-fullscreen", False)
 
-text.unbind("<KeyRelease>")
-text.bind('<KeyRelease>', lambda e: (on_key_release(), sync_scroll()))
-text.bind('<MouseWheel>', lambda e: sync_scroll())
-text.bind('<ButtonRelease-1>', lambda e: sync_scroll())
-text.bind('<Configure>', update_line_numbers)
-text.bind("<<Paste>>", lambda: (root.after(10, highlight_full_document)))
+text.bind('<KeyRelease>', on_key_and_scroll)
+text.bind('<MouseWheel>', on_mousewheel)
+text.bind('<ButtonRelease-1>', on_button_release)
+text.bind('<Configure>', on_configure)
+text.bind("<<Paste>>", on_paste)
 text.bind('<Return>', auto_indent)
-text.bind('<BackSpace>', update_line_numbers)
+text.bind('<BackSpace>', lambda e: (update_line_numbers(), None))
 text.bind("<Control-o>", open_file)
 text.bind("<Control-s>", save_file)
 text.bind("<Control-D>", open_folder)
@@ -2596,9 +2621,9 @@ def set_ui():
     guilang_index = menu.index(tk.END)
     guilang_menu.add_radiobutton(label="English", variable=lang_var, value="en", command=on_lang_change)
     guilang_menu.add_radiobutton(label="Nederlands", variable=lang_var, value="nl", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="Español", variable=lang_var, value="es", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="Français", variable=lang_var, value="fr", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="日本語", variable=lang_var, value="jp", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="EspaÃ±ol", variable=lang_var, value="es", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="FranÃ§ais", variable=lang_var, value="fr", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="æ—¥æœ¬èªž", variable=lang_var, value="jp", command=on_lang_change)
 
 def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
@@ -2672,9 +2697,8 @@ except:
     pass
 if session.get('file'):
     try:
-        with open(session['file'], 'r', encoding='utf-8') as f:
-            content = f.read()
-        root.after(0, update_gui, session['file'], content)
+        current_file = session['file']
+        load_file(current_file)
     except Exception as e:
         print(translate.get("error_b1") + f"{e}")
         
@@ -2695,23 +2719,12 @@ if session.get('guilang'):
     on_lang_change()
 if session.get('save_new_file'):
     save_new_file.set(save_new_file.get())
-highlight_full_document()
-
 
 if len(sys.argv) > 1:
     file_to_open = os.path.abspath(sys.argv[1])
     if os.path.isfile(file_to_open):
-        try:
-            with open(file_to_open, "r", encoding="utf-8") as f:
-                text.delete("1.0", tk.END)
-                text.insert("1.0", f.read())
-            root.title(f"Slash Code - {os.path.basename(file_to_open)}")
-            current_file = file_to_open
-            highlight_full_document()
-            save_session()
-            load_session()
-        except Exception as e:
-            messagebox.showerror(translate.get("error_a1"), translate.get("error_a3") + f"{e}")
+        current_file = file_to_open
+        load_file(file_to_open)
             
 root.after(100, update_minimap)
 update_line_numbers()
