@@ -10,26 +10,49 @@ import subprocess
 import tempfile
 import sys
 import random
-from platform import *
+import platform
 import threading
+try:
+    import requests
+except ImportError:
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+        import requests
+    except (Exception, subprocess.CalledProcessError) as e:
+        requests = None
 from tkinter import filedialog, scrolledtext, messagebox, ttk, font
 current_file = ""
 FOLDER = ""
 open_folder_btn = None
 
 root = tk.Tk()
-if os.name == "nt" and sys.executable != "":
+
+url = "https://raw.githubusercontent.com/clydezzz-sleepy/Slash-Code/refs/heads/main/slash.ico"
+filename = "slash.ico"
+icon_dir = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "ico")
+icon_path = os.path.join(icon_dir, filename)
+
+if not os.path.exists(icon_path):
     try:
-        root.iconbitmap(os.path.abspath("slash.ico"))
+        response = requests.get(url)
+        response.raise_for_status()
+        os.makedirs(icon_dir, exist_ok=True)
+        with open(icon_path, "wb") as f:
+            f.write(response.content)
+    except Exception:
+        pass
+
+if os.name == "nt":
+    try:
+        root.iconbitmap(icon_path)
     except Exception:
         pass
 else:
     try:
-       icon = tk.PhotoImage(file=os.path.abspath("slash.png"))
-       root.iconphoto(True, icon)
+        icon = tk.PhotoImage(file=os.path.abspath("slash.png"))
+        root.iconphoto(True, icon)
     except Exception:
         pass
-root.title("Slash Code")
 
 language_var = tk.StringVar(value='plaintext')
 GUILANGS = {
@@ -599,6 +622,10 @@ def update_ui_text():
         view_menu.entryconfig(1, label=translate.get("zoom_out"))
         view_menu.entryconfig(3, label=translate.get("show_sidebar"))
         view_menu.entryconfig(4, label=translate.get("hide_sidebar"))
+        view_menu.entryconfig(5, label=translate.get("show_minimap"))
+        view_menu.entryconfig(6, label=translate.get("hide_minimap"))
+        view_menu.entryconfig(8, label=translate.get("toggle_fullscreen"))
+        view_menu.entryconfig(9, label=translate.get("exit_fullscreen"))
     except Exception as e:
         print(translate.get("error_c5"), e)
 
@@ -2621,9 +2648,9 @@ def set_ui():
     guilang_index = menu.index(tk.END)
     guilang_menu.add_radiobutton(label="English", variable=lang_var, value="en", command=on_lang_change)
     guilang_menu.add_radiobutton(label="Nederlands", variable=lang_var, value="nl", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="EspaÃ±ol", variable=lang_var, value="es", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="FranÃ§ais", variable=lang_var, value="fr", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="æ—¥æœ¬èªž", variable=lang_var, value="jp", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Español", variable=lang_var, value="es", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Français", variable=lang_var, value="fr", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="日本語", variable=lang_var, value="jp", command=on_lang_change)
 
 def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
