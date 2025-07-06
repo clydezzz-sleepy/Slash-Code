@@ -73,6 +73,10 @@ GUILANGS = {
     "error_c8": "GUI language label update error:",
     "find": "Find",
     "find_query": "Find:",
+    "find_all": "Find All",
+    "replace": "Replace",
+    "replace_query": "Replace:",
+    "replace_all": "Replace All",
     "runner_not_found": " not found!\n",
     "install_suggest": "Please install it first.\n",
     "instructions": "Instructions: ",
@@ -157,6 +161,10 @@ GUILANGS = {
     "error_c8": "Fout bij het bijwerken van het GUI-taallabel:",
     "find": "Vind",
     "find_query": "Vind:",
+    "find_all": "Vind Alle",
+    "replace": "Vervang",
+    "replace_query": "Vervang:",
+    "replace_all": "Vervang Alle",
     "runner_not_found": " niet gevonden!\n",
     "install_suggest": "Installeer het alstublieft eerst.\n",
     "instructions": "Instructies: ",
@@ -240,6 +248,10 @@ GUILANGS = {
     "error_c8": "Error al actualizar la etiqueta del idioma de la GUI:",
     "find": "Buscar",
     "find_query": "Buscar:",
+    "find_all": "Buscar todos",
+    "replace": "Reemplazar", 
+    "replace_query": "Reemplazar:", 
+    "replace_all": "Reemplazar Todo",
     "runner_not_found": " no encontrado!\n",
     "install_suggest": "Por favor instálalo primero.\n",
     "instructions": "Instrucciones: ",
@@ -322,6 +334,10 @@ GUILANGS = {
     "error_c8": "Erreur de mise à jour du libellé de langue de l'interface graphique:",
     "find": "Rechercher",
     "find_query": "Rechercher:",
+    "find_all": "Recherchez tout",
+    "replace": "Remplacer", 
+    "replace_query": "Remplacer:", 
+    "replace_all": "Remplacer Tout",
     "runner_not_found": " introuvable!\n",
     "install_suggest": "Veuillez l'installer d'abord.\n",
     "instructions": "Instructions: ",
@@ -406,6 +422,10 @@ GUILANGS = {
     "error_c8": "GUI言語ラベル更新エラー:",
     "find": "検索",
     "find_query": "検索：",
+    "find_all": "すべてを検索ます",
+    "replace": "交換", 
+    "replace_query": "交換：", 
+    "replace_all": "すべてを交換します",
     "runner_not_found": " が見つかりません！\n",
     "install_suggest": "まずインストールしてください。\n",
     "instructions": "使い方：",
@@ -603,6 +623,7 @@ def update_ui_text():
         edit_menu.entryconfig(0, label=translate.get("undo"))
         edit_menu.entryconfig(1, label=translate.get("redo"))
         edit_menu.entryconfig(3, label=translate.get("find"))
+        edit_menu.entryconfig(4, label=translate.get("replace"))
     except Exception as e:
         print(translate.get("error_c3"), e)
 
@@ -2066,14 +2087,14 @@ text.config(yscrollcommand=on_text_scroll)
 def on_scroll(event=None):
     line_numbers.yview_moveto(text.yview()[0])
     minimap.yview_moveto(text.yview()[0])
-    update_line_numbers()
     return None
 
-def on_key_and_scroll(event=None):
+def sync_scroll(first, last):
     line_numbers.yview_moveto(text.yview()[0])
     minimap.yview_moveto(text.yview()[0])
-    update_line_numbers()
     return None
+
+text['yscrollcommand'] = sync_scroll
 
 def on_minimap_click(event):
     height = minimap.winfo_height()
@@ -2307,8 +2328,50 @@ def find_text(event=None):
     tk.Label(find_win, text=translate.get("find_query")).pack(side=tk.LEFT)
     entry = tk.Entry(find_win)
     entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    tk.Button(find_win, text="Find All", command=do_find).pack(side=tk.LEFT)
+    tk.Button(find_win, text=translate.get("find_all"), command=do_find).pack(side=tk.LEFT)
     entry.focus_set()
+
+def replace_text():
+    replace_win = tk.Toplevel(root)
+    replace_win.title(translate.get("replace"))
+    replace_win.transient(root)
+    replace_win.grab_set()
+
+    tk.Label(replace_win, text=translate.get("find_query")).grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    find_entry = tk.Entry(replace_win, width=30)
+    find_entry.grid(row=0, column=1, padx=5, pady=5)
+
+    tk.Label(replace_win, text=translate.get("replace")).grid(row=1, column=0, padx=5, pady=5, sticky="e")
+    replace_entry = tk.Entry(replace_win, width=30)
+    replace_entry.grid(row=1, column=1, padx=5, pady=5)
+
+    def do_replace():
+        find_text = find_entry.get()
+        replace_text_val = replace_entry.get()
+        content = text.get("1.0", tk.END)
+        new_content = content.replace(find_text, replace_text_val)
+        text.delete("1.0", tk.END)
+        text.insert("1.0", new_content)
+        highlight_full_document()
+        replace_win.destroy()
+
+    def do_replace_next():
+        find_text_val = find_entry.get()
+        replace_text_val = replace_entry.get()
+        idx = text.search(find_text_val, text.index(tk.INSERT), tk.END)
+        if idx:
+            end_idx = f"{idx}+{len(find_text_val)}c"
+            text.delete(idx, end_idx)
+            text.insert(idx, replace_text_val)
+            text.tag_add('found', start_pos, end_pos)
+            text.tag_config('found', background='yellow', foreground='black')
+            text.mark_set(tk.INSERT, f"{idx}+{len(replace_text_val)}c")
+            highlight_full_document()
+
+    tk.Button(replace_win, text=translate.get("replace"), command=do_replace_next).grid(row=2, column=0, padx=5, pady=5)
+    tk.Button(replace_win, text=translate.get("replace_all"), command=do_replace).grid(row=2, column=1, padx=5, pady=5)
+
+    find_entry.focus_set()
 
 def bind_tooltips():
     lang = language_var.get()
@@ -2504,8 +2567,8 @@ def update_line_numbers(event=None):
     line_numbers.delete('1.0', tk.END)
     row_count = int(text.index('end-1c').split('.')[0])
     row_count = max(1, row_count)
-    line_numbers.config(width=len(str(row_count)) + 1)
     line_numbers.insert('1.0', '\n'.join(str(i) for i in range(1, row_count + 1)))
+    line_numbers.config(width=len(str(row_count)) + 1)
     line_numbers.config(state='disabled')
     if event is not None:
         text.edit_modified(False)
@@ -2563,6 +2626,7 @@ text.bind("<Control-j>", show_sidebar)
 text.bind("<Control-l>", hide_sidebar)
 text.bind("<Control-r>", run_code)
 text.bind("<Control-f>", find_text)
+text.bind("<Control-h>", replace_text)
 text.bind("<Control-n>", new_file)
 text.bind("<Control-t>", clean_temp_files)
 text.bind("<F11>", toggle_fullscreen)
@@ -2606,6 +2670,7 @@ def set_ui():
     edit_menu.add_command(label=translate.get("redo"), command=redo_action, accelerator="Ctrl+Y")
     edit_menu.add_separator()
     edit_menu.add_command(label=translate.get("find"), command=find_text, accelerator="Ctrl+F")
+    edit_menu.add_command(label=translate.get("replace"), command=replace_text, accelerator="Ctrl+H")
 
     menu.add_cascade(label=translate.get("theme"), menu=theme_menu)
     theme_index = menu.index(tk.END)
@@ -2760,4 +2825,5 @@ root.after(100, update_minimap)
 update_line_numbers()
             
 root.mainloop()
+
 
