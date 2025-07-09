@@ -2792,8 +2792,12 @@ except:
     pass
 if session.get('file'):
     try:
-        current_file = session['file']
-        load_file(current_file)
+        if len(sys.argv) > 1:
+            current_file = os.path.abspath(sys.argv[1])
+            load_file(current_file)
+        else:
+            current_file = session['file']
+            load_file(current_file)
     except Exception as e:
         print(translate.get("error_b1") + f"{e}")
         
@@ -2825,5 +2829,3 @@ root.after(100, update_minimap)
 update_line_numbers()
             
 root.mainloop()
-
-
