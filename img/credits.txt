@@ -1,0 +1,10 @@
+-- Credits --
+These images (en.png, es.png, fr.png, jp.png, nl.png, de.png, it.png, zh.png, ko.png, ar.png) have been imported into the Slash Code editor and Slash Code needs to credit the author of these images in order for Slash Code to genuinely use them.
+here, we'll mention the author of these images that are used in Slash Code itself.
+- These images are illustrated by Freepik (https://www.freepik.com) and have been published on Flaticon (https://flaticon.com, more specifically https://www.flaticon.com/packs/countrys-flags).
+
+* Note: You do not need this in order to use Slash Code whatsoever and this is only written due to legal copyright restrictions preventing local users to use images without doing what the author says so in order to make use of the product.
+
+____________________________________________________________________________________________________________________________________________________________________________
+
+-- Slash Code Editor, 2025 --
