@@ -183,5 +183,5 @@ For questions or support, please open an issue on GitHub or contact my email, `c
 ![How it will look like in a C++ script.](cpp.png)
 ![A second example of how it will look like in a C++ script.](cpp_2.png)
 ![How it will look like in a CSS script.](css.png)
-![How it will look like in a Ren'Py script.](renpy.png)
+![How it will look like in a Ren'Py script.](rpy.png)
 ![How it will look like in a Shell Script (/Bash) script.](shell.png)
