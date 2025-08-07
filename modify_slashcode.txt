@@ -1,0 +1,49 @@
+In case you need to modify the Slash Code Text Editor in any way, you'll need to follow these steps:
+    
+1. In your dedicated text editor (either Notepad, VS Code, Sublime Text, Vim, etc.), you'll need to open the Slash Code source file (named SlashCode.py) and you should be able to modify it to how you want it. Modify anything you'd like and make sure to save it right after.
+
+2. After that, if you're finished, the first thing you should do is open up your system's terminal (whether it's the Windows Command Prompt, the Linux Gnome-Terminal (the terminal differs between Linux "Distro's"), or the MacOS Terminal, any kind of terminal is fine), if you have Python 3.12+, you should be able to use "py(.exe)" properly, if your Python version is lower than 3.12, consider using "python(.exe)".
+
+3. Once you've opened your dedicated system's terminal, a few commands you can run to rebuild and use the modified Slash Code executable will be shown in a bit, but you'll need to make sure you have PyInstaller installed first. To install PyInstaller, these are some platform friendly ways to install the module through pip:
+
+Windows:
+    py -m pip install PyInstaller
+    or:
+    python -m pip install PyInstaller
+
+Linux:
+    python3 -m pip3 install PyInstaller
+    or:
+    python -m pip3 install PyInstaller
+    On Debian/Ubuntu:
+        sudo apt update && sudo apt-get install python3-pyinstaller
+
+MacOS:
+    python3 -m pip install PyInstaller
+    or:
+    brew install pyinstaller
+
+4. Once PyInstaller has been installed on your computer, you'll need to run a command that requires PyInstaller in order for you to use an executable again that you modified, that's why it was needed for you to install PyInstaller before everything. For this, in order to build Slash Code's executable, but with your modified code integrated into Slash Code, then you're required to input something like this (best command you can do for now):
+
+Windows:
+    py -m PyInstaller --windowed --onefile --clean --noupx --optimize 2 -i %USERPROFILE%\Downloads\SlashCodeFolderName\slash.ico SlashCode.py
+
+Linux/MacOS:
+    pyinstaller --windowed --onefile --clean --noupx --optimize 2 --strip --icon=/home/your_user/SlashCodeFolderName/slash.ico SlashCode.py
+
+5. You'll need to wait a bit for it to finish, if it fails to successfully create the executable for Slash Code, then there's most likely something wrong in your code, PyInstaller will almost always tell you why it cannot build the executable. If building the executable succeeded, you'll see two new folders pop up; 'build' and 'dist'. You can forget about the build folder, you only need the dist folder, which is where the executable takes place in. This is how you can run the executable:
+
+Windows:
+    You can just directly click the .exe file and Slash Code will automatically open up for you.
+
+Linux:
+    You'll need to make it an executable first, this is how you can do so:
+         chmod +x dist/SlashCode
+         ./dist/SlashCode 
+
+MacOS:
+    You'll need to use the .7z compressed folder that contains the .app executable for MacOS that's included on the Slash Code GitHub page, you can extract the compressed folder and once extracted, you can freely click on the .app executable.
+
+Good luck on modifying Slash Code, may it become something successful for you!
+
+-- SlashCode --
