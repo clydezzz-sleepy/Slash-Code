@@ -1,4 +1,8 @@
 from setuptools import setup
+import os
+
+if os.environ.get('CI') == 'true':
+    os.environ['CODE_SIGN_IDENTITY'] = ''
 
 APP = ['SlashCode.py']
 DATA_FILES = []
