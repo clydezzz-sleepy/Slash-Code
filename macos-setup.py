@@ -6,7 +6,9 @@ OPTIONS = {
     'argv_emulation': True,
     'iconfile': None,
     'includes': [],
-    'codesign_identity': None,
+    'plist': {
+        'CFBundleIdentifier': 'com.clydezzz-sleepy.slashcode',
+    },
     'bdist_base': 'build',
     'packages': [],
 }
