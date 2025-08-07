@@ -94,6 +94,18 @@ More translations will be added with future updates!
 
 ## Recent Updates
 
+> _Notable improvements have been made enhancing the GUI icons handling, file saving, and code stability._
+
+1. GUI language icons now use **Pillow** (PIL) for more efficient and reliable image loading and conversion to Tkinter images.
+
+2. Fixed a critical file saving bug where the code incorrectly tried to write to an undefined variable path. This is now corrected to use the proper variable, restoring save functionality.
+
+3. Moved the `GUILANGS` dictionary and GUITranslate class to the start of the file to avoid any definition errors, especially for functions like `show_generror()` that rely on them.
+
+4. Optimized **f-string highlighting** to work correctly on every single line across documents, fixing prior issues where only limited lines were supported.
+
+---
+
 > _This is the biggest update yet! Potentially the last one if no major bugs emerge — and I’m very proud of it._
 
 1. Complete implementation of **full translations** for all UI strings and messages.
