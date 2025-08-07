@@ -5,7 +5,10 @@ DATA_FILES = []
 OPTIONS = {
     'argv_emulation': True,
     'iconfile': None,
-    'includes': []
+    'includes': [],
+    'codesign_identity': None,
+    'bdist_base': 'build',
+    'packages': [],
 }
 
 setup(
