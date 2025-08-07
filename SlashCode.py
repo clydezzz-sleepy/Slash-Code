@@ -12,12 +12,15 @@ import sys
 import random
 import platform
 import threading
+import shutil
+import psutil # type: ignore
+from pathlib import Path
 try:
-    import requests
+    import requests # type: ignore
 except ImportError:
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-        import requests
+        import requests # type: ignore
     except (Exception, subprocess.CalledProcessError) as e:
         requests = None
 from tkinter import filedialog, scrolledtext, messagebox, ttk, font
@@ -27,20 +30,76 @@ open_folder_btn = None
 
 root = tk.Tk()
 
+encodings = ['utf-8', 'utf-16', 'latin1', 'cp1252']
+
+def get_tcl_tk_env():
+    env = os.environ.copy()
+    python_base = os.path.dirname(sys.executable)
+    tcl_library = os.path.join(python_base, "tcl", "tcl8.6")
+    tk_library = os.path.join(python_base, "tcl", "tk8.6")
+
+    if os.path.isdir(tcl_library):
+        env["TCL_LIBRARY"] = tcl_library
+    if os.path.isdir(tk_library):
+        env["TK_LIBRARY"] = tk_library
+    return env
+tcltk_env = get_tcl_tk_env()
+ 
+def show_generror(exc):
+    print(f"{translate.get('error_a1')}:\n\n{exc}")
+
 url = "https://raw.githubusercontent.com/clydezzz-sleepy/Slash-Code/refs/heads/main/slash.ico"
+alt_url = "https://i.imgur.com/HqnIx28.png"
 filename = "slash.ico"
+alt_filename = "slash.png"
 icon_dir = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "ico")
 icon_path = os.path.join(icon_dir, filename)
-
+alt_icon_path = os.path.join(icon_dir, alt_filename)
 if not os.path.exists(icon_path):
     try:
-        response = requests.get(url)
+        header = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=header, timeout=5)
         response.raise_for_status()
         os.makedirs(icon_dir, exist_ok=True)
         with open(icon_path, "wb") as f:
             f.write(response.content)
-    except Exception:
-        pass
+        alt_response = requests.get(alt_url, headers=header, timeout=5)
+        alt_response.raise_for_status()
+    except Exception as e:
+        show_generror(e)
+lang_icons_dir = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "img")
+os.makedirs(lang_icons_dir, exist_ok=True)
+icon_meta = {
+    'en': ("https://i.imgur.com/8dhbFPz.png", os.path.join(lang_icons_dir, "en.png")),
+    'nl': ("https://i.imgur.com/YP1GxGK.png", os.path.join(lang_icons_dir, "nl.png")),
+    'de': ("https://i.imgur.com/5U6hklL.png", os.path.join(lang_icons_dir, "de.png")),
+    'es': ("https://i.imgur.com/6cmIOgg.png", os.path.join(lang_icons_dir, "es.png")),
+    'it': ("https://i.imgur.com/bzHSS22.png", os.path.join(lang_icons_dir, "it.png")),
+    'fr': ("https://i.imgur.com/21QFuei.png", os.path.join(lang_icons_dir, "fr.png")),
+    'jp': ("https://i.imgur.com/vUE262x.png", os.path.join(lang_icons_dir, "jp.png")),
+    'zh': ("https://i.imgur.com/2n6Mk8I.png", os.path.join(lang_icons_dir, "zh.png")),
+    'ko': ("https://i.imgur.com/EsY4wrL.png", os.path.join(lang_icons_dir, "ko.png")),
+    'ar': ("https://i.imgur.com/n9PtDCa.png", os.path.join(lang_icons_dir, "ar.png"))
+}
+
+language_icons = {}
+
+for lang, (url, path) in icon_meta.items():
+    if not os.path.exists(path):
+        try:
+            header = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(url, headers=header, timeout=5)
+            response.raise_for_status()
+            with open(path, "wb") as f:
+                f.write(response.content)
+        except Exception as e:
+            language_icons[lang] = tk.PhotoImage(width=16, height=16)
+            continue
+    try:
+        language_icons[lang] = tk.PhotoImage(file=path)
+    except Exception as e:
+        show_generror(e)
+        language_icons[lang] = tk.PhotoImage(width=16, height=16)
 
 if os.name == "nt":
     try:
@@ -59,9 +118,53 @@ GUILANGS = {
     "en": {
     "gui_lang": "GUI Language",
     "msys_install": "MSYS2 installed. Please install MinGW via MSYS2 shell: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "Failed to install MinGW-w64:",
+    "gcc_used": "GCC used:",
+    "gcc_error_a1": "Installing G++ failed.",
+    "gcc_error_a2": "Failed to check G++ version:",
+    "gcc_error_b1": "G++ compiler not found. Aborting C++ run.",
+    "gcc_error_b2": "Failed to install MinGW compiler.\n",
+    "cpp_usercode_written": "User's C++ code written to ***.",
+    "gcc_check_a1": "Checking for existing G++ compiler...",
+    "gcc_check_a2": "Downloading and installing MinGW-w64...",
+    "gcc_check_a3": "Downloading MinGW-w64 from ***...", # This will eventually be f"{translate.get("gcc_check_a3").replace("***", mingw_url)}".
+    "gcc_check_a4": "Downloaded *** MB so far...", # The same with this one, as specified above (and also all the other ones that contain '***').
+    "gcc_check_a4_5": "Downloaded *** MB in total.",
+    "gcc_check_b1": "Extracting MinGW-w64 archive...",
+    "gcc_check_b2": "Attempting to install/update G++ compiler...",
+    "gcc_compilation_attempt": "Attempting compilation with flag ***:",
+    "gcc_compilation_success": "Compilation succeeded, running executable...",
+    "gcc_compilation_failed": "Compilation failed for *** with errors:",
+    "gcc_execution_finished": "Execution finished successfully.",
+    "gcc_execution_error_a1": "An error has occurred while attempting to run the executable:",
+    "gcc_mingw_addpath": "MinGW-w64 bin folder added to PATH:",
+    "gcc_compiler_installed": "G++ installed/updated successfully.",
+    "gcc_found_compiler_ver": "Found G++ version:",
+    "gcc_sufficient_compiler_ver": "The G++ version is sufficient.",
+    "gcc_old_compiler_ver": "Your G++ version is too old and needs to be upgraded.",
+    "gcc_mingw_extracted": "Extraction complete. MinGW installed at:",
+    "py7zr_installed": "The py7zr package was successfully installed.",
+    "py7zr_error_a1": "The package py7zr was not found, installing py7zr package...",
+    "csc_compiler": "C# Compiler (csc)",
+    "cs_usercode_written": "User C# code written to ***.",
+    "csc_error_a1": "C# Compiler (csc) not found. Attempting to install...\n",
+    "csc_error_a2": "CSC compiler not found and installation failed. Aborting C# run.",
+    "csc_autoinst_fail": "Failed to auto-install C# compiler. Please install the .NET SDK manually.\n",
+    "csc_compiler_installed": "C# Compiler (csc) installed successfully.\n",
+    "csc_compiling_with": "Compiling with:",
+    "csc_compilation_success": "Compilation succeeded.\n",
+    "csc_execution_finished": "Execution finished successfully.",
+    "csc_execution_error_a1": "An error has occurred while attempting to run the executable:",
+    "sh_platform_not_supported": "Your platform isn't supported to run Shell Script scripts.",
+    "py_error_a1_title": "Insufficient Python Version",
+    "py_error_a1": "Please install Python 3.13+.",
+    "py_error_a2": "Python interpreter not found.",
+    "py_error_a3": "Could not parse Python version.",
     "error_a1": "Error",
     "error_a2": "Could not open file",
     "error_a3": "Could not open file:\n",
+    "error_a4": "Could not write to file:\n",
+    "error_a5": "Could not load the Slash Code source file. Reason:\n\n",
     "error_c0": "Folder button update error:",
     "error_c1": "Menu label update error:",
     "error_c2": "File label update error:",
@@ -71,6 +174,12 @@ GUILANGS = {
     "error_c6": "View label update error:",
     "error_c7": "Language label update error:",
     "error_c8": "GUI language label update error:",
+    "error_d1": "An exception has occurred while attempting to execute the document's code. The reason for this is:\n\n",
+    "error_d1_5": "An exception has occurred while attempting to write to and execute the document. The reason for this is:\n\n",
+    "error_d2": "The compiler failed to install properly.",
+    "error_e1": "pip failed to install py7z. Reason:",
+    "deleting_dirs": "Deleting director(y/ies): ",
+    "directory_del_not_found": "No director(y/ies) was/were found to delete.",
     "find": "Find",
     "find_query": "Find:",
     "find_all": "Find All",
@@ -83,7 +192,7 @@ GUILANGS = {
     "compilation_error": "Compilation Error:\n",
     "opened_in_browser": "Opened in default browser.",
     "language_not_supported": "Language not supported for execution.",
-    "process_error": "Process Error ",
+    "process_error": "Process Error: ",
     "unexpected_error": "Unexpected Error: ",
     "cleanup_failed": "Cleanup failed: ",
     "file": "File",
@@ -92,6 +201,9 @@ GUILANGS = {
     "save": "Save",
     "toggle_new_file_saving": "Toggle New File Saving",
     "clean_temp_files": "Clean Temporary Files",
+    "clean_temp_directories": "Clean Temporary Directories",
+    "fully_wipe_directories": "Fully Wipe Temporary Directories",
+    "reboot_consolemode": "Reboot In Console Mode",
     "exit": "Exit",
     "edit": "Edit",
     "undo": "Undo",
@@ -114,10 +226,15 @@ GUILANGS = {
     "hide_sidebar": "Hide Sidebar",
     "show_minimap": "Show Minimap",
     "hide_minimap": "Hide Minimap",
+    "show_debug_info": "Show Debug Info",
+    "hide_debug_info": "Hide Debug Info",
     "toggle_fullscreen": "Toggle Fullscreen",
     "exit_fullscreen": "Exit Fullscreen",
     "run": "Run",
     "run_file": "Run File",
+    "sc_output": "SC-Output",
+    "output_sc_title": "-- Slash Code Text Editor | SC-Output for File Execution --",
+    "save_output_text": "Save Output Text",
     "highlighting_as": "Highlighting as: ",
     "plaintext": "Plain Text",
     "python": "Python",
@@ -128,6 +245,7 @@ GUILANGS = {
     "cs": "C#",
     "markdown": "Markdown",
     "renpy": "Ren'Py",
+    "shell": "Shell Script",
     "python_files": "Python Files",
     "javascript_files": "JavaScript Files",
     "html_files": "HTML Files",
@@ -139,7 +257,11 @@ GUILANGS = {
     "css_files": "CSS Files",
     "markdown_files": "Markdown Files",
     "renpy_files": "Ren'Py Files",
+    "shell_files": "Shell Files",
     "all_files": "All Files",
+    "binary_file_title": "Binary File Detected",
+    "binary_file": "Unusual characters have been detected in this document, would you like to open it and have Slash Code read raw data?\nWarning, this likely will slow down Slash Code.",
+    "session_loaded": "Session loaded:",
     "error_b1": "Error loading file: ",
     "error_b2": "Error loading directory: "
     },
@@ -147,9 +269,52 @@ GUILANGS = {
     "nl": {
     "gui_lang": "GUI Taal",
     "msys_install": "MSYS2 is geinstalleerd. Installeer alstublieft MinGW via de MSYS2 shell: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "Kon niet MinGW-w64 succesvol installeren:",
+    "gcc_used": "GCC gebruikt:",
+    "gcc_error_a1": "Installatie van G++ mislukt.",
+    "gcc_error_a2": "Controleren van G++ versie mislukt:",
+    "gcc_error_b1": "G++ compiler niet gevonden. C++ uitvoering geannuleerd.",
+    "gcc_error_b2": "Installatie van MinGW compiler mislukt.\n",
+    "cpp_usercode_written": "Gebruikers C++ code weggeschreven naar ***.",
+    "gcc_check_a1": "Controleren op bestaande G++ compiler...",
+    "gcc_check_a2": "MinGW-w64 wordt gedownload en geïnstalleerd...",
+    "gcc_check_a3": "MinGW-w64 wordt gedownload van ***...",
+    "gcc_check_a4": "Tot nu toe *** MB gedownload...",
+    "gcc_check_a4_5": "In totaal *** MB gedownload.",
+    "gcc_check_b1": "MinGW-w64 archief wordt uitgepakt...",
+    "gcc_check_b2": "Poging tot installatie/update van G++ compiler...",
+    "gcc_compilation_attempt": "Proberen te compileren met vlag ***:",
+    "gcc_compilation_success": "Compilatie geslaagd, uitvoerbaar bestand wordt gestart...",
+    "gcc_compilation_failed": "Compilatie mislukt voor *** met foutmeldingen:",
+    "gcc_execution_finished": "Uitvoering succesvol afgerond.",
+    "gcc_execution_error_a1": "Er is een fout opgetreden bij het uitvoeren van het programma:",
+    "gcc_mingw_addpath": "MinGW-w64 bin map toegevoegd aan PATH:",
+    "gcc_compiler_installed": "G++ succesvol geïnstalleerd/geüpdatet.",
+    "gcc_found_compiler_ver": "G++ versie gevonden:",
+    "gcc_sufficient_compiler_ver": "De G++ versie is voldoende.",
+    "gcc_old_compiler_ver": "Je G++ versie is te oud en moet worden bijgewerkt.",
+    "gcc_mingw_extracted": "Uitpakken voltooid. MinGW geïnstalleerd op:",
+    "py7zr_installed": "Het py7zr pakket is succesvol geïnstalleerd.",
+    "csc_compiler": "C# Compiler (csc)",
+    "cs_usercode_written": "Gebruiker's C# code weggeschreven naar ***.",
+    "csc_error_a1": "C# Compiler (csc) niet gevonden. Poging tot installatie...\n",
+    "csc_error_a2": "CSC compiler niet gevonden en installatie mislukt. C# uitvoering afgebroken.",
+    "csc_autoinst_fail": "Automatische installatie van C# compiler mislukt. Installeer de .NET SDK handmatig.\n",
+    "csc_compiler_installed": "C# Compiler (csc) succesvol geïnstalleerd.\n",
+    "csc_compiling_with": "Compileren met:",
+    "csc_compilation_success": "Compilatie geslaagd.\n",
+    "csc_execution_finished": "Uitvoering succesvol afgerond.",
+    "csc_execution_error_a1": "Er is een fout opgetreden bij het uitvoeren van het programma:",
+    "sh_platform_not_supported": "Uw platform wordt niet ondersteund voor het uitvoeren van Shell Script scripts.",
+    "py_error_a1_title": "Onvoldoende Python-versie",
+    "py_error_a1": "Installeer Python 3.13+.",
+    "py_error_a2": "Python-interpreter niet gevonden.",
+    "py_error_a3": "Kan Python-versie niet parseren.",
     "error_a1": "Fout",
     "error_a2": "Kon niet bestand openen",
     "error_a3": "Kon niet bestand openen:\n",
+    "error_a4": "Kon niet schrijven naar bestand:\n",
+    "error_a5": "Kan het bronbestand van Slash Code niet laden. Reden:\n\n",
     "error_c0": "Fout bij het bijwerken van de mapknop:",
     "error_c1": "Fout bij het bijwerken van het menulabel:",
     "error_c2": "Fout bij het bijwerken van het bestandslabel:",
@@ -159,6 +324,12 @@ GUILANGS = {
     "error_c6": "Fout bij het bijwerken van het label weergeven:",
     "error_c7": "Fout bij het bijwerken van het taallabel:",
     "error_c8": "Fout bij het bijwerken van het GUI-taallabel:",
+    "error_d1": "Er is een exceptie opgetreden bij het uitvoeren van de code in het document. De reden hiervoor is:\n\n",
+    "error_d1_5": "Er is een fout opgetreden tijdens het schrijven naar en uitvoeren van het document. De reden hiervoor is:\n\n",
+    "error_d2": "De compiler is niet correct geïnstalleerd.",
+    "deleting_dirs": "Map(pen) verwijderen:",
+    "error_e1": "pip kon py7z niet installeren. Reden:",
+    "directory_del_not_found": "Er is/zijn geen map(pen) gevonden om te verwijderen.",
     "find": "Vind",
     "find_query": "Vind:",
     "find_all": "Vind Alle",
@@ -171,7 +342,7 @@ GUILANGS = {
     "compilation_error": "Compilatie fout:\n",
     "opened_in_browser": "Geopend in de standaard browser.",
     "language_not_supported": "Taal niet gesteund voor executie.",
-    "process_error": "Proces fout ",
+    "process_error": "Proces fout: ",
     "unexpected_error": "Onverwachte fout: ",
     "cleanup_failed": "Schoonmaking gefaald: ",
     "file": "Bestand",
@@ -180,6 +351,9 @@ GUILANGS = {
     "save": "Opslaan",
     "toggle_new_file_saving": "Nieuw Bestand Opslaan Inschakelen",
     "clean_temp_files": "Temporaire Bestanden Wissen",
+    "clean_temp_directories": "Temporaire Mappen Volledig Wissen",
+    "fully_wipe_directories": "Temporaire Mappen Wissen",
+    "reboot_consolemode": "Opnieuw Opstarten In Consolemodus",
     "exit": "Verlaten",
     "edit": "Bewerken",
     "undo": "Ongedaan Maken",
@@ -202,10 +376,15 @@ GUILANGS = {
     "hide_sidebar": "Maak Zijbalk Onzichtbaar",
     "show_minimap": "Maak Minikaart Zichtbaar",
     "hide_minimap": "Maak Minikaart Onzichtbaar",
+    "show_debug_info": "Toon foutopsporingsinfo",
+    "hide_debug_info": "Verberg foutopsporingsinfo",
     "toggle_fullscreen": "Volledig Scherm Inschakelen",
     "exit_fullscreen": "Volledig Scherm Verlaten",
     "run": "Uitvoeren",
     "run_file": "Bestand Uitvoeren",
+    "sc_output": "SC-Uitvoer",
+    "output_sc_title": "-- Slash Code Teksteditor | SC-Uitvoer voor bestandsuitvoering --",
+    "save_output_text": "Uitvoertekst opslaan",
     "highlighting_as": "Wordt gemarkeerd als: ",
     "plaintext": "Platte Text",
     "python": "Python",
@@ -216,6 +395,7 @@ GUILANGS = {
     "cs": "C#",
     "markdown": "Markdown",
     "renpy": "Ren'Py",
+    "shell": "Shell Script",
     "python_files": "Python Bestanden",
     "javascript_files": "JavaScript Bestanden",
     "html_files": "HTML Bestanden",
@@ -227,16 +407,213 @@ GUILANGS = {
     "css_files": "CSS Bestanden",
     "markdown_files": "Markdown Bestanden",
     "renpy_files": "Ren'Py Bestanden",
+    "shell_files": "Shell Bestanden",
     "all_files": "Alle Bestanden",
+    "binary_file_title": "Binair Bestand Gedetecteerd",
+    "binary_file": "Er zijn ongebruikelijke tekens in dit document gedetecteerd. Wilt u het openen en de ruwe data door Slash Code laten lezen?\nWaarschuwing: dit zal Slash Code waarschijnlijk vertragen.",
+    "session_loaded": "Sessie geladen:",
     "error_b1": "Fout gedurend bestand laden: ",
     "error_b2": "Fout gedurend map laden: "
+    },
+    "de": {
+    "gui_lang": "GUI-Sprache",
+    "msys_install": "MSYS2 installiert. Bitte MinGW über die MSYS2-Shell installieren: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "Installation von MinGW-w64 fehlgeschlagen:",
+    "gcc_used": "Genutztes GCC:",
+    "gcc_error_a1": "Installation von G++ fehlgeschlagen.",
+    "gcc_error_a2": "Überprüfung der G++-Version fehlgeschlagen:",
+    "gcc_error_b1": "G++-Compiler nicht gefunden. Abbruch des C++-Laufs.",
+    "gcc_error_b2": "Installation des MinGW-Compilers fehlgeschlagen.\n",
+    "cpp_usercode_written": "C++-Code des Benutzers geschrieben nach ***.",
+    "gcc_check_a1": "Suche nach vorhandenem G++-Compiler...",
+    "gcc_check_a2": "Herunterladen und Installieren von MinGW-w64...",
+    "gcc_check_a3": "MinGW-w64 wird von *** heruntergeladen...",
+    "gcc_check_a4": "Bisher *** MB heruntergeladen...",
+    "gcc_check_a4_5": "Insgesamt *** MB heruntergeladen.",
+    "gcc_check_b1": "Entpacke MinGW-w64-Archiv...",
+    "gcc_check_b2": "Versuche, G++-Compiler zu installieren/aktualisieren...",
+    "gcc_compilation_attempt": "Versuch der Kompilierung mit Flag ***:",
+    "gcc_compilation_success": "Kompilierung erfolgreich, führe ausführbare Datei aus...",
+    "gcc_compilation_failed": "Kompilierung für *** mit Fehlern fehlgeschlagen:",
+    "gcc_execution_finished": "Ausführung erfolgreich beendet.",
+    "gcc_execution_error_a1": "Beim Ausführen der ausführbaren Datei ist ein Fehler aufgetreten:",
+    "gcc_mingw_addpath": "MinGW-w64 bin-Ordner wurde PATH hinzugefügt:",
+    "gcc_compiler_installed": "G++ erfolgreich installiert/aktualisiert.",
+    "gcc_found_compiler_ver": "Gefundene G++-Version:",
+    "gcc_sufficient_compiler_ver": "Die G++-Version ist ausreichend.",
+    "gcc_old_compiler_ver": "Deine G++-Version ist zu alt und muss aktualisiert werden.",
+    "gcc_mingw_extracted": "Entpackung abgeschlossen. MinGW installiert in:",
+    "py7zr_installed": "Das py7zr-Paket wurde erfolgreich installiert.",
+    "py7zr_error_a1": "Das Paket py7zr wurde nicht gefunden, installiere py7zr...",
+    "csc_compiler": "C#-Compiler (csc)",
+    "cs_usercode_written": "C#-Code des Benutzers geschrieben nach ***.",
+    "csc_error_a1": "C#-Compiler (csc) nicht gefunden. Versuche zu installieren...\n",
+    "csc_error_a2": "CSC-Compiler nicht gefunden und Installation fehlgeschlagen. C#-Lauf abgebrochen.",
+    "csc_autoinst_fail": "Automatische Installation des C#-Compilers fehlgeschlagen. Bitte installiere das .NET SDK manuell.\n",
+    "csc_compiler_installed": "C#-Compiler (csc) erfolgreich installiert.\n",
+    "csc_compiling_with": "Kompiliere mit:",
+    "csc_compilation_success": "Kompilierung erfolgreich.\n",
+    "csc_execution_finished": "Ausführung erfolgreich beendet.",
+    "csc_execution_error_a1": "Beim Versuch, die ausführbare Datei auszuführen, ist ein Fehler aufgetreten:",
+    "sh_platform_not_supported": "Deine Plattform unterstützt das Ausführen von Shell-Skripten nicht.",
+    "py_error_a1_title": "Unzureichende Python-Version",
+    "py_error_a1": "Bitte installiere Python 3.13+.",
+    "py_error_a2": "Python-Interpreter nicht gefunden.",
+    "py_error_a3": "Python-Version konnte nicht analysiert werden.",
+    "error_a1": "Fehler",
+    "error_a2": "Datei konnte nicht geöffnet werden",
+    "error_a3": "Datei konnte nicht geöffnet werden:\n",
+    "error_a4": "Datei konnte nicht beschrieben werden:\n",
+    "error_a5": "Quellcode-Datei von Slash Code konnte nicht geladen werden. Grund:\n\n",
+    "error_c0": "Fehler beim Aktualisieren des Ordner-Buttons:",
+    "error_c1": "Fehler beim Aktualisieren des Menü-Labels:",
+    "error_c2": "Fehler beim Aktualisieren des Datei-Labels:",
+    "error_c3": "Fehler beim Aktualisieren des Editier-Labels:",
+    "error_c4": "Fehler beim Aktualisieren des Theme-Labels:",
+    "error_c5": "Fehler beim Aktualisieren des Ausführungs-Labels:",
+    "error_c6": "Fehler beim Aktualisieren des Ansicht-Labels:",
+    "error_c7": "Fehler beim Aktualisieren des Sprach-Labels:",
+    "error_c8": "Fehler beim Aktualisieren des GUI-Sprach-Labels:",
+    "error_d1": "Beim Ausführen des Dokumentcodes ist eine Ausnahme aufgetreten. Grund:\n\n",
+    "error_d1_5": "Beim Schreiben und Ausführen des Dokuments ist eine Ausnahme aufgetreten. Grund:\n\n",
+    "error_d2": "Der Compiler wurde nicht korrekt installiert.",
+    "error_e1": "pip konnte py7z nicht installieren. Grund:",
+    "deleting_dirs": "Lösche Verzeichnis(se): ",
+    "directory_del_not_found": "Keine Verzeichnisse zum Löschen gefunden.",
+    "find": "Suchen",
+    "find_query": "Suchen:",
+    "find_all": "Alle suchen",
+    "replace": "Ersetzen",
+    "replace_query": "Ersetzen:",
+    "replace_all": "Alle ersetzen",
+    "runner_not_found": " nicht gefunden!\n",
+    "install_suggest": "Bitte zuerst installieren.\n",
+    "instructions": "Anleitung: ",
+    "compilation_error": "Kompilierfehler:\n",
+    "opened_in_browser": "Im Standardbrowser geöffnet.",
+    "language_not_supported": "Sprache wird für Ausführung nicht unterstützt.",
+    "process_error": "Prozessfehler: ",
+    "unexpected_error": "Unerwarteter Fehler: ",
+    "cleanup_failed": "Bereinigung fehlgeschlagen: ",
+    "file": "Datei",
+    "new": "Neu",
+    "open": "Öffnen",
+    "save": "Speichern",
+    "toggle_new_file_saving": "Neues Dateispeichern umschalten",
+    "clean_temp_files": "Temporäre Dateien bereinigen",
+    "clean_temp_directories": "Temporäre Verzeichnisse bereinigen",
+    "fully_wipe_directories": "Temporäre Verzeichnisse vollständig löschen",
+    "reboot_consolemode": "Im Konsolenmodus neu starten",
+    "exit": "Beenden",
+    "edit": "Bearbeiten",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen",
+    "language": "Sprache",
+    "theme": "Thema",
+    "theme_light": "Hell",
+    "theme_dark": "Dunkel",
+    "theme_dracula": "Dracula",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "Nacht-Eule",
+    "theme_shades_of_purple": "Lila Nuancen",
+    "theme_high_contrast": "Hoher Kontrast",
+    "open_folder": "Ordner öffnen",
+    "changed_language_to": "Sprache geändert zu ",
+    "view": "Ansicht",
+    "zoom_in": "Vergrößern",
+    "zoom_out": "Verkleinern",
+    "show_sidebar": "Seitenleiste anzeigen",
+    "hide_sidebar": "Seitenleiste ausblenden",
+    "show_minimap": "Minikarte anzeigen",
+    "hide_minimap": "Minikarte ausblenden",
+    "show_debug_info": "Debug-Informationen anzeigen",
+    "hide_debug_info": "Debug-Informationen ausblenden",
+    "toggle_fullscreen": "Vollbild umschalten",
+    "exit_fullscreen": "Vollbild verlassen",
+    "run": "Ausführen",
+    "run_file": "Datei ausführen",
+    "sc_output": "SC-Ausgabe",
+    "output_sc_title": "-- Slash Code Texteditor | SC-Ausgabe für Dateiausführung --",
+    "save_output_text": "Ausgabetext speichern",
+    "highlighting_as": "Markierung als: ",
+    "plaintext": "Klartext",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
+    "shell": "Shell-Skript",
+    "python_files": "Python-Dateien",
+    "javascript_files": "JavaScript-Dateien",
+    "html_files": "HTML-Dateien",
+    "c_files": "C-Dateien",
+    "cpp_files": "C++-Dateien",
+    "header_files": "Header-Dateien",
+    "text_files": "Textdateien",
+    "cs_files": "C#-Dateien",
+    "css_files": "CSS-Dateien",
+    "markdown_files": "Markdown-Dateien",
+    "renpy_files": "Ren'Py-Dateien",
+    "shell_files": "Shell-Skriptdateien",
+    "all_files": "Alle Dateien",
+    "binary_file_title": "Binärdatei erkannt",
+    "binary_file": "Ungewöhnliche Zeichen wurden in diesem Dokument erkannt. Möchten Sie es öffnen und Slash Code die Rohdaten lesen lassen?\nWarnung: Dies wird Slash Code vermutlich verlangsamen.",
+    "session_loaded": "Sitzung geladen:",
+    "error_b1": "Fehler beim Laden der Datei: ",
+    "error_b2": "Fehler beim Laden des Verzeichnisses: "
     },
     "es": {
     "gui_lang": "GUI Lenguaje",
     "msys_install": "MSYS2 instalado. Por favor instala MinGW desde la terminal de MSYS2: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "Error al instalar MinGW-w64:",
+    "gcc_used": "GCC usado:",
+    "gcc_error_a1": "Falló la instalación de G++.",
+    "gcc_error_a2": "No se pudo verificar la versión de G++:",
+    "gcc_error_b1": "Compilador G++ no encontrado. Abortando ejecución de C++.",
+    "gcc_error_b2": "Falló la instalación del compilador MinGW.\n",
+    "cpp_usercode_written": "Código C++ del usuario guardado en ***.",
+    "gcc_check_a1": "Verificando existencia de compilador G++...",
+    "gcc_check_a2": "Descargando e instalando MinGW-w64...",
+    "gcc_check_a3": "Descargando MinGW-w64 desde ***...",
+    "gcc_check_a4": "Descargados *** MB hasta ahora...",
+    "gcc_check_a4_5": "Descargados *** MB en total.",
+    "gcc_check_b1": "Extrayendo archivo MinGW-w64...",
+    "gcc_check_b2": "Intentando instalar/actualizar compilador G++...",
+    "gcc_compilation_attempt": "Intentando compilar con la bandera ***:",
+    "gcc_compilation_success": "Compilación exitosa, ejecutando programa...",
+    "gcc_compilation_failed": "Compilación fallida para *** con errores:",
+    "gcc_execution_finished": "Ejecución finalizada exitosamente.",
+    "gcc_execution_error_a1": "Ocurrió un error al intentar ejecutar el programa:",
+    "gcc_mingw_addpath": "Carpeta bin de MinGW-w64 añadida al PATH:",
+    "gcc_compiler_installed": "G++ instalado/actualizado correctamente.",
+    "gcc_found_compiler_ver": "Versión de G++ encontrada:",
+    "gcc_sufficient_compiler_ver": "La versión de G++ es suficiente.",
+    "gcc_old_compiler_ver": "Tu versión de G++ es demasiado antigua y debe actualizarse.",
+    "gcc_mingw_extracted": "Extracción completa. MinGW instalado en:",
+    "py7zr_installed": "El paquete py7zr se instaló correctamente.",
+    "csc_compiler": "Compilador C# (csc)",
+    "cs_usercode_written": "Código C# del usuario guardado en ***.",
+    "csc_error_a1": "Compilador C# (csc) no encontrado. Intentando instalar...\n",
+    "csc_error_a2": "Compilador CSC no encontrado y la instalación falló. Abortando ejecución de C#.",
+    "csc_autoinst_fail": "Fallo al instalar automáticamente el compilador C#. Por favor, instala el SDK de .NET manualmente.\n",
+    "csc_compiler_installed": "Compilador C# (csc) instalado correctamente.\n",
+    "csc_compiling_with": "Compilando con:",
+    "csc_compilation_success": "Compilación exitosa.\n",
+    "csc_execution_finished": "Ejecución finalizada exitosamente.",
+    "csc_execution_error_a1": "Se ha producido un error al intentar ejecutar el programa:",
+    "sh_platform_not_supported": "Tu plataforma no es compatible para ejecutar scripts Shell Script.",
+    "py_error_a1_title": "Versión de Python insuficiente",
+    "py_error_a1": "Instale Python 3.13+.",
+    "py_error_a2": "No se encontró el intérprete de Python.",
+    "py_error_a3": "No se pudo analizar la versión de Python.",
     "error_a1": "Error",
     "error_a2": "No se pudo abrir el archivo",
     "error_a3": "No se pudo abrir el archivo:\n",
+    "error_a4": "No se pudo escribir el archivo:\n",
+    "error_a5": "No se pudo cargar el archivo fuente de Slash Code. Motivo:\n\n",
     "error_c0": "Error al actualizar el botón de carpeta:",
     "error_c1": "Error al actualizar la etiqueta del menú:",
     "error_c2": "Error al actualizar la etiqueta del archivo:",
@@ -246,6 +623,12 @@ GUILANGS = {
     "error_c6": "Error al actualizar la etiqueta de la vista:",
     "error_c7": "Error al actualizar la etiqueta del idioma:",
     "error_c8": "Error al actualizar la etiqueta del idioma de la GUI:",
+    "error_d1": "Se ha producido una excepción al intentar ejecutar el código del documento. La razón es:\n\n",
+    "error_d1_5": "Se produjo una excepción al intentar escribir y ejecutar el documento. La razón es:\n\n",
+    "error_d2": "El compilador no se instaló correctamente.",
+    "error_e1": "pip no pudo instalar py7z. Motivo:",
+    "deleting_dirs": "Eliminando directorio(s): ", 
+    "directory_del_not_found": "No se encontraron directorio(s) para eliminar.",
     "find": "Buscar",
     "find_query": "Buscar:",
     "find_all": "Buscar todos",
@@ -258,7 +641,7 @@ GUILANGS = {
     "compilation_error": "Error de compilación:\n",
     "opened_in_browser": "Abierto en el navegador predeterminado.",
     "language_not_supported": "Idioma no compatible para ejecución.",
-    "process_error": "Error del proceso ",
+    "process_error": "Error del proceso: ",
     "unexpected_error": "Error inesperado: ",
     "cleanup_failed": "Fallo al limpiar: ",
     "file": "Archivo",
@@ -267,6 +650,9 @@ GUILANGS = {
     "save": "Guardar",
     "toggle_new_file_saving": "Activar el guardado de nuevos archivos",
     "clean_temp_files": "Limpiar archivos temporales",
+    "clean_temp_directories": "Limpiar directorios temporales",
+    "fully_wipe_directories": "Borrar completamente los directorios temporales",
+    "reboot_consolemode": "Reiniciar en modo consola",
     "exit": "Salir",
     "edit": "Editar",
     "undo": "Deshacer",
@@ -288,10 +674,15 @@ GUILANGS = {
     "hide_sidebar": "Ocultar barra lateral",
     "show_minimap": "Mostrar minimapa",
     "hide_minimap": "Ocultar minimapa",
+    "show_debug_info": "Mostrar información de depuración",
+    "hide_debug_info": "Ocultar información de depuración",
     "toggle_fullscreen": "Activar pantalla completa",
     "exit_fullscreen": "Salir de pantalla completa",
     "run": "Ejecutar",
     "run_file": "Ejecutar archivo",
+    "sc_output": "SC-Producción",
+    "output_sc_title": "-- Editor de texto de Slash Code | Salida SC para ejecución de archivos --",
+    "save_output_text": "Guardar texto de salida",
     "highlighting_as": "Resaltado como: ",
     "plaintext": "Texto plano",
     "python": "Python",
@@ -302,6 +693,7 @@ GUILANGS = {
     "cs": "C#",
     "markdown": "Markdown",
     "renpy": "Ren'Py",
+    "shell": "Script de Shell",
     "python_files": "Archivos de Python",
     "javascript_files": "Archivos de JavaScript",
     "html_files": "Archivos de HTML",
@@ -313,17 +705,213 @@ GUILANGS = {
     "css_files": "Archivos de CSS",
     "markdown_files": "Archivos de Markdown",
     "renpy_files": "Archivos de Ren'Py",
+    "shell_files": "Archivos de Shell",
     "all_files": "Todos Los Archivos",
+    "binary_file_title": "Archivo binario detectado",
+    "binary_file": "Se han detectado caracteres inusuales en este documento. ¿Desea abrirlo y que Slash Code lea los datos sin procesar?\nAdvertencia: esto probablemente ralentizará Slash Code.",
+    "session_loaded": "Sesión cargada:",
     "error_b1": "Error al cargar el archivo: ",
     "error_b2": "Error al cargar el directorio: "
     },
-    
+    "it": {
+    "gui_lang": "Lingua GUI",
+    "msys_install": "MSYS2 installato. Per favore installa MinGW tramite la shell MSYS2: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "Installazione di MinGW-w64 fallita:",
+    "gcc_used": "GCC utilizzato:",
+    "gcc_error_a1": "Installazione di G++ fallita.",
+    "gcc_error_a2": "Impossibile controllare la versione di G++:",
+    "gcc_error_b1": "Compilatore G++ non trovato. Interruzione esecuzione C++.",
+    "gcc_error_b2": "Installazione del compilatore MinGW fallita.\n",
+    "cpp_usercode_written": "Codice C++ utente scritto in ***.",
+    "gcc_check_a1": "Verifica della presenza di un compilatore G++ esistente...",
+    "gcc_check_a2": "Download e installazione di MinGW-w64 in corso...",
+    "gcc_check_a3": "Download di MinGW-w64 da *** in corso...",
+    "gcc_check_a4": "*** MB scaricati finora...",
+    "gcc_check_a4_5": "*** MB scaricati in totale.",
+    "gcc_check_b1": "Estrazione dell'archivio MinGW-w64 in corso...",
+    "gcc_check_b2": "Tentativo di installazione/aggiornamento del compilatore G++...",
+    "gcc_compilation_attempt": "Tentativo di compilazione con flag ***:",
+    "gcc_compilation_success": "Compilazione riuscita, esecuzione del file eseguibile...",
+    "gcc_compilation_failed": "Compilazione fallita per *** con errori:",
+    "gcc_execution_finished": "Esecuzione completata con successo.",
+    "gcc_execution_error_a1": "Errore durante il tentativo di eseguire il file eseguibile:",
+    "gcc_mingw_addpath": "Cartella bin di MinGW-w64 aggiunta al PATH:",
+    "gcc_compiler_installed": "G++ installato/aggiornato con successo.",
+    "gcc_found_compiler_ver": "Versione di G++ trovata:",
+    "gcc_sufficient_compiler_ver": "La versione di G++ è sufficiente.",
+    "gcc_old_compiler_ver": "La tua versione di G++ è troppo vecchia e deve essere aggiornata.",
+    "gcc_mingw_extracted": "Estrazione completata. MinGW installato in:",
+    "py7zr_installed": "Il pacchetto py7zr è stato installato con successo.",
+    "py7zr_error_a1": "Pacchetto py7zr non trovato, installazione in corso...",
+    "csc_compiler": "Compilatore C# (csc)",
+    "cs_usercode_written": "Codice C# utente scritto in ***.",
+    "csc_error_a1": "Compilatore C# (csc) non trovato. Tentativo di installazione in corso...\n",
+    "csc_error_a2": "Compilatore CSC non trovato e installazione fallita. Interruzione esecuzione C#.",
+    "csc_autoinst_fail": "Installazione automatica del compilatore C# fallita. Si prega di installare manualmente il .NET SDK.\n",
+    "csc_compiler_installed": "Compilatore C# (csc) installato con successo.\n",
+    "csc_compiling_with": "Compilazione con:",
+    "csc_compilation_success": "Compilazione riuscita.\n",
+    "csc_execution_finished": "Esecuzione completata con successo.",
+    "csc_execution_error_a1": "Si è verificato un errore durante il tentativo di eseguire il file eseguibile:",
+    "sh_platform_not_supported": "La tua piattaforma non supporta l'esecuzione di script Shell.",
+    "py_error_a1_title": "Versione Python insufficiente",
+    "py_error_a1": "Si prega di installare Python 3.13 o superiore.",
+    "py_error_a2": "Interpreter Python non trovato.",
+    "py_error_a3": "Impossibile analizzare la versione di Python.",
+    "error_a1": "Errore",
+    "error_a2": "Impossibile aprire il file",
+    "error_a3": "Impossibile aprire il file:\n",
+    "error_a4": "Impossibile scrivere nel file:\n",
+    "error_a5": "Impossibile caricare il file sorgente di Slash Code. Motivo:\n\n",
+    "error_c0": "Errore durante l'aggiornamento del pulsante cartella:",
+    "error_c1": "Errore durante l'aggiornamento dell'etichetta del menu:",
+    "error_c2": "Errore durante l'aggiornamento dell'etichetta del file:",
+    "error_c3": "Errore durante l'aggiornamento dell'etichetta modifica:",
+    "error_c4": "Errore durante l'aggiornamento dell'etichetta tema:",
+    "error_c5": "Errore durante l'aggiornamento dell'etichetta esecuzione:",
+    "error_c6": "Errore durante l'aggiornamento dell'etichetta visualizzazione:",
+    "error_c7": "Errore durante l'aggiornamento dell'etichetta lingua:",
+    "error_c8": "Errore durante l'aggiornamento dell'etichetta lingua GUI:",
+    "error_d1": "Si è verificata un'eccezione durante il tentativo di eseguire il codice del documento. Il motivo è:\n\n",
+    "error_d1_5": "Si è verificata un'eccezione durante il tentativo di scrivere e eseguire il documento. Il motivo è:\n\n",
+    "error_d2": "Il compilatore non è stato installato correttamente.",
+    "error_e1": "pip non è riuscito a installare py7z. Motivo:",
+    "deleting_dirs": "Eliminazione della/e cartella/e: ",
+    "directory_del_not_found": "Nessuna cartella trovata per l'eliminazione.",
+    "find": "Trova",
+    "find_query": "Trova:",
+    "find_all": "Trova tutto",
+    "replace": "Sostituisci",
+    "replace_query": "Sostituisci con:",
+    "replace_all": "Sostituisci tutto",
+    "runner_not_found": " non trovato!\n",
+    "install_suggest": "Si prega di installarlo prima.\n",
+    "instructions": "Istruzioni: ",
+    "compilation_error": "Errore di compilazione:\n",
+    "opened_in_browser": "Aperto nel browser predefinito.",
+    "language_not_supported": "Lingua non supportata per l'esecuzione.",
+    "process_error": "Errore del processo: ",
+    "unexpected_error": "Errore imprevisto: ",
+    "cleanup_failed": "Pulizia fallita: ",
+    "file": "File",
+    "new": "Nuovo",
+    "open": "Apri",
+    "save": "Salva",
+    "toggle_new_file_saving": "Attiva disattiva salvataggio nuovo file",
+    "clean_temp_files": "Pulisci file temporanei",
+    "clean_temp_directories": "Pulisci cartelle temporanee",
+    "fully_wipe_directories": "Cancella completamente le cartelle temporanee",
+    "reboot_consolemode": "Riavvia in modalità console",
+    "exit": "Esci",
+    "edit": "Modifica",
+    "undo": "Annulla",
+    "redo": "Ripristina",
+    "language": "Lingua",
+    "theme": "Tema",
+    "theme_light": "Chiaro",
+    "theme_dark": "Scuro",
+    "theme_dracula": "Dracula",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "Gufo Notturno",
+    "theme_shades_of_purple": "Tonalità di Viola",
+    "theme_high_contrast": "Alto Contrasto",
+    "open_folder": "Apri cartella",
+    "changed_language_to": "Lingua cambiata in ",
+    "view": "Visualizza",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "show_sidebar": "Mostra barra laterale",
+    "hide_sidebar": "Nascondi barra laterale",
+    "show_minimap": "Mostra minimappa",
+    "hide_minimap": "Nascondi minimappa",
+    "show_debug_info": "Mostra info debug",
+    "hide_debug_info": "Nascondi info debug",
+    "toggle_fullscreen": "Attiva/disattiva full screen",
+    "exit_fullscreen": "Esci dal full screen",
+    "run": "Esegui",
+    "run_file": "Esegui file",
+    "sc_output": "Output SC",
+    "output_sc_title": "-- Editor di Testo Slash Code | Output SC per esecuzione file --",
+    "save_output_text": "Salva testo output",
+    "highlighting_as": "Evidenziando come: ",
+    "plaintext": "Testo semplice",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
+    "shell": "Script di Shell",
+    "python_files": "File Python",
+    "javascript_files": "File JavaScript",
+    "html_files": "File HTML",
+    "c_files": "File C",
+    "cpp_files": "File C++",
+    "header_files": "File header",
+    "text_files": "File di testo",
+    "cs_files": "File C#",
+    "css_files": "File CSS",
+    "markdown_files": "File Markdown",
+    "renpy_files": "File Ren'Py",
+    "shell_files": "File Shell",
+    "all_files": "Tutti i file",
+    "binary_file_title": "File binario rilevato",
+    "binary_file": "Caratteri insoliti sono stati rilevati in questo documento, vuoi aprirlo e lasciare che Slash Code legga i dati grezzi?\nAttenzione, questo probabilmente rallenterà Slash Code.",
+    "session_loaded": "Sessione caricata:",
+    "error_b1": "Errore nel caricamento del file: ",
+    "error_b2": "Errore nel caricamento della cartella: "
+    },
     "fr": {
     "gui_lang": "Langue de l'interface",
     "msys_install": "MSYS2 est installé. Veuillez installer MinGW via le terminal MSYS2 : pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "Échec de l'installation de MinGW-w64:",
+    "gcc_used": "GCC utilisé:",
+    "gcc_error_a1": "Échec de l'installation de G++.",
+    "gcc_error_a2": "Échec de la vérification de la version de G++:",
+    "gcc_error_b1": "Compilateur G++ introuvable. Exécution C++ annulée.",
+    "gcc_error_b2": "Échec de l'installation du compilateur MinGW.\n",
+    "cpp_usercode_written": "Code C++ de l'utilisateur écrit dans ***.",
+    "gcc_check_a1": "Vérification de l'existence du compilateur G++...",
+    "gcc_check_a2": "Téléchargement et installation de MinGW-w64...",
+    "gcc_check_a3": "Téléchargement de MinGW-w64 depuis ***...",
+    "gcc_check_a4": "*** Mo téléchargés jusqu'à présent...",
+    "gcc_check_a4_5": "*** Mo téléchargés en total.",
+    "gcc_check_b1": "Extraction de l'archive MinGW-w64...",
+    "gcc_check_b2": "Tentative d'installation/mise à jour du compilateur G++...",
+    "gcc_compilation_attempt": "Tentative de compilation avec le drapeau ***:",
+    "gcc_compilation_success": "Compilation réussie, exécution du programme...",
+    "gcc_compilation_failed": "Échec de la compilation pour *** avec erreurs:",
+    "gcc_execution_finished": "Exécution terminée avec succès.",
+    "gcc_execution_error_a1": "Une erreur est survenue lors de l'exécution du programme:",
+    "gcc_mingw_addpath": "Dossier bin de MinGW-w64 ajouté au PATH:",
+    "gcc_compiler_installed": "G++ installé/mis à jour avec succès.",
+    "gcc_found_compiler_ver": "Version de G++ trouvée:",
+    "gcc_sufficient_compiler_ver": "La version de G++ est suffisante.",
+    "gcc_old_compiler_ver": "Votre version de G++ est trop ancienne, une mise à jour est nécessaire.",
+    "gcc_mingw_extracted": "Extraction terminée. MinGW installé à:",
+    "py7zr_installed": "Le package py7zr a été installé avec succès.",
+    "csc_compiler": "Compilateur C# (csc)",
+    "cs_usercode_written": "Code C# de l'utilisateur écrit dans ***.",
+    "csc_error_a1": "Compilateur C# (csc) introuvable. Tentative d'installation...\n",
+    "csc_error_a2": "Compilateur CSC introuvable et échec de l'installation. Exécution C# annulée.",
+    "csc_autoinst_fail": "Échec de l'installation automatique du compilateur C#. Veuillez installer le SDK .NET manuellement.\n",
+    "csc_compiler_installed": "Compilateur C# (csc) installé avec succès.\n",
+    "csc_compiling_with": "Compilation avec:",
+    "csc_compilation_success": "Compilation réussie.\n",
+    "csc_execution_finished": "Exécution terminée avec succès.",
+    "csc_execution_error_a1": "Une erreur s'est produite lors de la tentative d'exécution du programme:",
+    "sh_platform_not_supported": "Votre plateforme ne prend pas en charge l'exécution de scripts Shell.",
+    "py_error_a1_title": "Version Python insuffisante",
+    "py_error_a1": "Veuillez installer Python 3.13+.",
+    "py_error_a2": "Interpréteur Python introuvable.", 
+    "py_error_a3": "Impossible d'analyser la version Python.",
     "error_a1": "Erreur",
     "error_a2": "Impossible d'ouvrir le fichier",
     "error_a3": "Impossible d'ouvrir le fichier:\n",
+    "error_a4": "Impossible d'écrire dans le fichier:\n",
+    "error_a5": "Impossible de charger le fichier source du Slash Code. Motif:\n\n",
     "error_c0": "Erreur de mise à jour du bouton de dossier:",
     "error_c1": "Erreur de mise à jour du libellé du menu:",
     "error_c2": "Erreur de mise à jour du libellé du fichier:",
@@ -332,6 +920,12 @@ GUILANGS = {
     "error_c6": "Erreur de mise à jour de l'étiquette d'affichage:",
     "error_c7": "Erreur de mise à jour du libellé de langue:",
     "error_c8": "Erreur de mise à jour du libellé de langue de l'interface graphique:",
+    "error_d1": "Une exception s'est produite lors de l'exécution du code du document. La raison en est:\n\n",
+    "error_d1_5": "Une exception s'est produite lors de la tentative d'écriture et d'exécution du document. La raison en est:\n\n",
+    "error_d2": "Le compilateur n'a pas pu s'installer correctement.",
+    "error_e1": "pip n'a pas réussi à installer py7z. Motif:",
+    "deleting_dirs": "Suppression de répertoire(s): ", 
+    "directory_del_not_found": "Aucun répertoire(s) à supprimer n'a été trouvé.",
     "find": "Rechercher",
     "find_query": "Rechercher:",
     "find_all": "Recherchez tout",
@@ -344,7 +938,7 @@ GUILANGS = {
     "compilation_error": "Erreur de compilation:\n",
     "opened_in_browser": "Ouvert dans le navigateur par défaut.",
     "language_not_supported": "Langue non prise en charge pour l'exécution.",
-    "process_error": "Erreur de processus ",
+    "process_error": "Erreur de processus: ",
     "unexpected_error": "Erreur inattendue: ",
     "cleanup_failed": "Échec du nettoyage: ",
     "file": "Fichier",
@@ -353,6 +947,9 @@ GUILANGS = {
     "save": "Enregistrer",
     "toggle_new_file_saving": "Activer l'enregistrement d'un nouveau fichier",
     "clean_temp_files": "Nettoyer les fichiers temporaires",
+    "clean_temp_directories": "Nettoyer les dossiers temporaires",
+    "fully_wipe_directories": "Effacer complètement les dossiers temporaires",
+    "reboot_consolemode": "Redémarrer en mode console",
     "exit": "Quitter",
     "edit": "Éditer",
     "undo": "Annuler",
@@ -375,10 +972,15 @@ GUILANGS = {
     "hide_sidebar": "Masquer la barre latérale",
     "show_minimap": "Afficher la minicarte",
     "hide_minimap": "Masquer la minicarte",
+    "show_debug_info": "Afficher les informations de débogage",
+    "hide_debug_info": "Masquer les informations de débogage",
     "toggle_fullscreen": "Activer le plein écran",
     "exit_fullscreen": "Quitter le plein écran",
     "run": "Exécuter",
     "run_file": "Exécuter le fichier",
+    "sc_output": "SC-Sortir",
+    "output_sc_title": "-- Éditeur de texte de Slash Code | Sortie SC pour l'exécution de fichiers --",
+    "save_output_text": "Enregistrer le texte de sortie",
     "highlighting_as": "Surlignage comme: ",
     "plaintext": "Texte brut",
     "python": "Python",
@@ -389,6 +991,7 @@ GUILANGS = {
     "cs": "C#",
     "markdown": "Markdown",
     "renpy": "Ren'Py",
+    "shell": "Script Shell",
     "python_files": "Fichiers Python",
     "javascript_files": "Fichiers JavaScript",
     "html_files": "Fichiers HTML",
@@ -400,7 +1003,11 @@ GUILANGS = {
     "css_files": "Fichiers CSS",
     "markdown_files": "Fichiers Markdown",
     "renpy_files": "Fichiers Ren'Py",
+    "shell_files": "Fichiers Shell",
     "all_files": "Tous Les Fichiers",
+    "binary_file_title": "Fichier binaire détecté",
+    "binary_file": "Des caractères inhabituels ont été détectés dans ce document. Souhaitez-vous l'ouvrir et laisser Slash Code lire les données brutes?\nAttention, cela risque de ralentir Slash Code.",
+    "session_loaded": "Session chargé:",
     "error_b1": "Erreur lors du chargement du fichier: ",
     "error_b2": "Erreur lors du chargement du dossier: "
     },
@@ -408,9 +1015,52 @@ GUILANGS = {
     "jp": {
     "gui_lang": "GUI 言語",
     "msys_install": "MSYS2がインストールされました。MSYS2シェルでMinGWをインストールしてください: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "MinGW-w64のインストールに失敗しました:",
+    "gcc_used": "使用中のGCC:",
+    "gcc_error_a1": "G++のインストールに失敗しました。",
+    "gcc_error_a2": "G++のバージョン確認に失敗しました:",
+    "gcc_error_b1": "G++コンパイラが見つかりません。C++の実行を中止します。",
+    "gcc_error_b2": "MinGWコンパイラのインストールに失敗しました。\n",
+    "cpp_usercode_written": "ユーザーのC++コードが***に書き込まれました。",
+    "gcc_check_a1": "既存のG++コンパイラを確認しています...",
+    "gcc_check_a2": "MinGW-w64をダウンロードしてインストールしています...",
+    "gcc_check_a3": "***からMinGW-w64をダウンロード中...",
+    "gcc_check_a4": "これまでに*** MBをダウンロードしました...",
+    "gcc_check_a4_5": "合計*** MBをダウンロードしました。",
+    "gcc_check_b1": "MinGW-w64アーカイブを解凍中...",
+    "gcc_check_b2": "G++コンパイラのインストール/更新を試みています...",
+    "gcc_compilation_attempt": "*** フラグでのコンパイルを試みています:",
+    "gcc_compilation_success": "コンパイル成功。実行ファイルを実行しています...",
+    "gcc_compilation_failed": "*** のコンパイルに失敗しました。エラー内容:",
+    "gcc_execution_finished": "実行が正常に終了しました。",
+    "gcc_execution_error_a1": "実行ファイルの起動中にエラーが発生しました:",
+    "gcc_mingw_addpath": "MinGW-w64のbinフォルダをPATHに追加しました:",
+    "gcc_compiler_installed": "G++が正常にインストール/更新されました。",
+    "gcc_found_compiler_ver": "検出されたG++バージョン:",
+    "gcc_sufficient_compiler_ver": "G++のバージョンは十分です。",
+    "gcc_old_compiler_ver": "G++のバージョンが古いため、アップグレードが必要です。",
+    "gcc_mingw_extracted": "解凍完了。MinGWは以下にインストールされました:",
+    "py7zr_installed": "py7zrパッケージが正常にインストールされました。",
+    "csc_compiler": "C# コンパイラー (csc)",
+    "cs_usercode_written": "ユーザーのC#コードが***に書き込まれました。",
+    "csc_error_a1": "C# コンパイラー (csc) が見つかりません。インストールを試みています...\n",
+    "csc_error_a2": "CSC コンパイラーが見つからず、インストールに失敗しました。C# 実行を中止します。",
+    "csc_autoinst_fail": "C# コンパイラーの自動インストールに失敗しました。手動で .NET SDK をインストールしてください。\n",
+    "csc_compiler_installed": "C# コンパイラー (csc) が正常にインストールされました。\n",
+    "csc_compiling_with": "以下の環境でコンパイル中:",
+    "csc_compilation_success": "コンパイル成功。\n",
+    "csc_execution_finished": "実行が正常に終了しました。",
+    "csc_execution_error_a1": "実行ファイルの起動中にエラーが発生しました:",
+    "sh_platform_not_supported": "お使いのプラットフォームではシェルスクリプトの実行はサポートされていません。",
+    "py_error_a1_title": "Pythonのバージョンが不十分です",
+    "py_error_a1": "Python 3.13以降をインストールしてください。",
+    "py_error_a2": "Pythonインタープリターが見つかりません。",
+    "py_error_a3": "Pythonのバージョンを解析できませんでした。",
     "error_a1": "エラー",
     "error_a2": "ファイルを開けませんでした",
     "error_a3": "ファイルを開けませんでした:\n",
+    "error_a4": "ファイルに書き込めませんでした:\n",
+    "error_a5": "スラッシュコードのソースファイルを読み込めませんでした。理由:\n\n",
     "error_c0": "フォルダボタン更新エラー:",
     "error_c1": "メニューラベル更新エラー:",
     "error_c2": "ファイルラベル更新エラー:",
@@ -420,27 +1070,36 @@ GUILANGS = {
     "error_c6": "表示ラベル更新エラー:",
     "error_c7": "言語ラベル更新エラー:",
     "error_c8": "GUI言語ラベル更新エラー:",
+    "error_d1": "ドキュメントのコードを実行中に例外が発生しました。理由は次の通りです:\n\n",
+    "error_d1_5": "ドキュメントの書き込みと実行中に例外が発生しました。理由は次の通りです:\n\n",
+    "error_d2": "コンパイラのインストールに失敗しました。",
+    "error_e1": "pipはpy7zのインストールに失敗しました。理由:",
+    "deleting_dirs": "ディレクトリを削除しています: ",
+    "directory_del_not_found": "削除するディレクトリが見つかりません。",
     "find": "検索",
-    "find_query": "検索：",
+    "find_query": "検索:",
     "find_all": "すべてを検索ます",
     "replace": "交換", 
-    "replace_query": "交換：", 
+    "replace_query": "交換:", 
     "replace_all": "すべてを交換します",
     "runner_not_found": " が見つかりません！\n",
     "install_suggest": "まずインストールしてください。\n",
-    "instructions": "使い方：",
-    "compilation_error": "コンパイルエラー：\n",
+    "instructions": "使い方:",
+    "compilation_error": "コンパイルエラー:\n",
     "opened_in_browser": "デフォルトのブラウザで開きました。",
     "language_not_supported": "この言語は実行に対応していません。",
-    "process_error": "プロセスエラー ",
-    "unexpected_error": "予期しないエラー：",
-    "cleanup_failed": "クリーンアップに失敗しました：",
+    "process_error": "プロセスエラー: ",
+    "unexpected_error": "予期しないエラー:",
+    "cleanup_failed": "クリーンアップに失敗しました:",
     "file": "ファイル",
     "new": "新規",
     "open": "開く",
     "save": "保存",
     "toggle_new_file_saving": "新しいファイルの保存を切り替える",
     "clean_temp_files": "一時ファイルを消去する",
+    "clean_temp_directories": "一時ディレクトリを消去する",
+    "fully_wipe_directories": "一時ディレクトリを完全に消去する",
+    "reboot_consolemode": "コンソールモードで再起動",
     "exit": "終了",
     "edit": "編集",
     "undo": "元に戻す",
@@ -463,11 +1122,16 @@ GUILANGS = {
     "hide_sidebar": "サイドバーを非表示",
     "show_minimap": "ミニマップを表示",
     "hide_minimap": "ミニマップを非表示",
+    "show_debug_info": "デバッグ情報を表示",
+    "hide_debug_info": "デバッグ情報を非表示",
     "toggle_fullscreen": "全画面表示の切り替え",
     "exit_fullscreen": "全画面表示を終了",
     "run": "実行",
     "run_file": "ファイルを実行",
-    "highlighting_as": "ハイライト：",
+    "sc_output": "SC-出力",
+    "output_sc_title": "-- スラッシュコードテキストエディター | ファイル実行用のSC出力 --",
+    "save_output_text": "出力テキストを保存",
+    "highlighting_as": "ハイライト:",
     "plaintext": "プレーンテキスト",
     "python": "Python",
     "javascript": "JavaScript",
@@ -477,6 +1141,7 @@ GUILANGS = {
     "cs": "C#",
     "markdown": "Markdown",
     "renpy": "Ren'Py",
+    "shell": "シェルスクリプト",
     "python_files": "Python ファイル",
     "javascript_files": "JavaScript ファイル",
     "html_files": "HTML ファイル",
@@ -487,11 +1152,464 @@ GUILANGS = {
     "cs_files": "C# ファイル",
     "css_files": "CSS ファイル",
     "markdown_files": "Markdown ファイル",
-    "renpy_files": "Ren'Py Files",
+    "renpy_files": "Ren'Py ファイル",
+    "shell_files": "Shell ファイル",
     "all_files": "全てのファイル",
-    "error_b1": "ファイルの読み込みエラー：",
-    "error_b2": "ディレクトリの読み込みエラー："
-}
+    "binary_file_title": "バイナリファイルが検出されました",
+    "binary_file": "このドキュメントで異常な文字が検出されました。ドキュメントを開いてSlash Codeに生データを読み取りますか?\n警告: これによりSlash Codeの速度が低下する可能性があります。",
+    "session_loaded": "セッションロード:",
+    "error_b1": "ファイルの読み込みエラー:",
+    "error_b2": "ディレクトリの読み込みエラー:"
+    },
+    "zh": {
+    "gui_lang": "界面语言",
+    "msys_install": "已安装 MSYS2。请通过 MSYS2 终端安装 MinGW: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "安装 MinGW-w64 失败:",
+    "gcc_used": "使用的 GCC:",
+    "gcc_error_a1": "安装 G++ 失败。",
+    "gcc_error_a2": "无法检查 G++ 版本:",
+    "gcc_error_b1": "未找到 G++ 编译器。中止 C++ 运行。",
+    "gcc_error_b2": "安装 MinGW 编译器失败。\n",
+    "cpp_usercode_written": "用户的 C++ 代码已写入至 ***。",
+    "gcc_check_a1": "检查现有的 G++ 编译器...",
+    "gcc_check_a2": "正在下载并安装 MinGW-w64...",
+    "gcc_check_a3": "正在从 *** 下载 MinGW-w64...",
+    "gcc_check_a4": "已下载 *** MB...",
+    "gcc_check_a4_5": "共下载 *** MB。",
+    "gcc_check_b1": "正在解压 MinGW-w64 存档...",
+    "gcc_check_b2": "尝试安装/更新 G++ 编译器...",
+    "gcc_compilation_attempt": "尝试使用标志 *** 进行编译:",
+    "gcc_compilation_success": "编译成功，正在运行可执行文件...",
+    "gcc_compilation_failed": "*** 的编译失败，错误如下:",
+    "gcc_execution_finished": "执行成功结束。",
+    "gcc_execution_error_a1": "尝试运行可执行文件时发生错误:",
+    "gcc_mingw_addpath": "已将 MinGW-w64 bin 文件夹添加到 PATH:",
+    "gcc_compiler_installed": "G++ 安装/更新成功。",
+    "gcc_found_compiler_ver": "找到的 G++ 版本:",
+    "gcc_sufficient_compiler_ver": "G++ 版本足够。",
+    "gcc_old_compiler_ver": "您的 G++ 版本过旧，需要升级。",
+    "gcc_mingw_extracted": "提取完成。MinGW 安装路径为:",
+    "py7zr_installed": "py7zr 软件包安装成功。",
+    "py7zr_error_a1": "未找到 py7zr 软件包，正在安装 py7zr...",
+    "csc_compiler": "C# 编译器 (csc)",
+    "cs_usercode_written": "用户的 C# 代码已写入至 ***。",
+    "csc_error_a1": "未找到 C# 编译器 (csc)。正在尝试安装...\n",
+    "csc_error_a2": "未找到 CSC 编译器且安装失败。中止 C# 运行。",
+    "csc_autoinst_fail": "自动安装 C# 编译器失败。请手动安装 .NET SDK。\n",
+    "csc_compiler_installed": "C# 编译器 (csc) 安装成功。\n",
+    "csc_compiling_with": "正在使用以下配置编译:",
+    "csc_compilation_success": "编译成功。\n",
+    "csc_execution_finished": "执行成功结束。",
+    "csc_execution_error_a1": "尝试运行可执行文件时发生错误:",
+    "sh_platform_not_supported": "您的平台不支持运行 Shell 脚本。",
+    "py_error_a1_title": "Python 版本不足",
+    "py_error_a1": "请安装 Python 3.13 及以上版本。",
+    "py_error_a2": "未找到 Python 解释器。",
+    "py_error_a3": "无法解析 Python 版本。",
+    "error_a1": "错误",
+    "error_a2": "无法打开文件",
+    "error_a3": "无法打开文件:\n",
+    "error_a4": "无法写入文件:\n",
+    "error_a5": "无法加载 Slash Code 源文件。原因:\n\n",
+    "error_c0": "更新文件夹按钮时出错:",
+    "error_c1": "更新菜单标签时出错:",
+    "error_c2": "更新文件标签时出错:",
+    "error_c3": "更新编辑标签时出错:",
+    "error_c4": "更新主题标签时出错:",
+    "error_c5": "更新运行标签时出错:",
+    "error_c6": "更新视图标签时出错:",
+    "error_c7": "更新语言标签时出错:",
+    "error_c8": "更新 GUI 语言标签时出错:",
+    "error_d1": "尝试执行文档代码时发生异常。原因如下:\n\n",
+    "error_d1_5": "尝试写入并执行文档时发生异常。原因如下:\n\n",
+    "error_d2": "编译器未正确安装。",
+    "error_e1": "pip 安装 py7z 失败。原因:",
+    "deleting_dirs": "正在删除目录:",
+    "directory_del_not_found": "未找到要删除的目录。",
+    "find": "查找",
+    "find_query": "查找:",
+    "find_all": "查找全部",
+    "replace": "替换",
+    "replace_query": "替换为:",
+    "replace_all": "全部替换",
+    "runner_not_found": " 未找到！\n",
+    "install_suggest": "请先安装它。\n",
+    "instructions": "说明:",
+    "compilation_error": "编译错误:\n",
+    "opened_in_browser": "已在默认浏览器打开。",
+    "language_not_supported": "不支持该语言的执行。",
+    "process_error": "进程错误:",
+    "unexpected_error": "意外错误:",
+    "cleanup_failed": "清理失败:",
+    "file": "文件",
+    "new": "新建",
+    "open": "打开",
+    "save": "保存",
+    "toggle_new_file_saving": "切换新文件保存",
+    "clean_temp_files": "清理临时文件",
+    "clean_temp_directories": "清理临时目录",
+    "fully_wipe_directories": "完全清除临时目录",
+    "reboot_consolemode": "控制台模式重启",
+    "exit": "退出",
+    "edit": "编辑",
+    "undo": "撤销",
+    "redo": "重做",
+    "language": "语言",
+    "theme": "主题",
+    "theme_light": "浅色",
+    "theme_dark": "深色",
+    "theme_dracula": "德古拉",
+    "theme_monokai": "Monokai",
+    "theme_night_owl": "夜猫子",
+    "theme_shades_of_purple": "紫色渐变",
+    "theme_high_contrast": "高对比度",
+    "open_folder": "打开文件夹",
+    "changed_language_to": "语言切换至 ",
+    "view": "查看",
+    "zoom_in": "放大",
+    "zoom_out": "缩小",
+    "show_sidebar": "显示侧边栏",
+    "hide_sidebar": "隐藏侧边栏",
+    "show_minimap": "显示小地图",
+    "hide_minimap": "隐藏小地图",
+    "show_debug_info": "显示调试信息",
+    "hide_debug_info": "隐藏调试信息",
+    "toggle_fullscreen": "切换全屏",
+    "exit_fullscreen": "退出全屏",
+    "run": "运行",
+    "run_file": "运行文件",
+    "sc_output": "SC-输出",
+    "output_sc_title": "-- Slash Code 文本编辑器 | 文件执行的 SC-输出 --",
+    "save_output_text": "保存输出文本",
+    "highlighting_as": "高亮为:",
+    "plaintext": "纯文本",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
+    "shell": "Shell 脚本",
+    "python_files": "Python 文件",
+    "javascript_files": "JavaScript 文件",
+    "html_files": "HTML 文件",
+    "c_files": "C 文件",
+    "cpp_files": "C++ 文件",
+    "header_files": "头文件",
+    "text_files": "文本文件",
+    "cs_files": "C# 文件",
+    "css_files": "CSS 文件",
+    "markdown_files": "Markdown 文件",
+    "renpy_files": "Ren'Py 文件",
+    "shell_files": "Shell 文件",
+    "all_files": "所有文件",
+    "binary_file_title": "检测到二进制文件",
+    "binary_file": "检测到文档中有异常字符，是否打开并让 Slash Code 读取原始数据？\n警告:这可能会降低 Slash Code 的速度。",
+    "session_loaded": "会话已加载:",
+    "error_b1": "加载文件时出错:",
+    "error_b2": "加载目录时出错:"
+    },
+    "ko": {
+    "gui_lang": "GUI 언어",
+    "msys_install": "MSYS2가 설치되었습니다. MSYS2 셸에서 MinGW를 설치하십시오: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "MinGW-w64 설치 실패:",
+    "gcc_used": "사용된 GCC:",
+    "gcc_error_a1": "G++ 설치 실패.",
+    "gcc_error_a2": "G++ 버전 확인 실패:",
+    "gcc_error_b1": "G++ 컴파일러를 찾을 수 없습니다. C++ 실행 중단.",
+    "gcc_error_b2": "MinGW 컴파일러 설치 실패.\n",
+    "cpp_usercode_written": "사용자 C++ 코드가 ***에 작성되었습니다.",
+    "gcc_check_a1": "기존 G++ 컴파일러 확인 중...",
+    "gcc_check_a2": "MinGW-w64 다운로드 및 설치 중...",
+    "gcc_check_a3": "***에서 MinGW-w64 다운로드 중...",
+    "gcc_check_a4": "*** MB 다운로드 완료...",
+    "gcc_check_a4_5": "총 *** MB 다운로드 완료.",
+    "gcc_check_b1": "MinGW-w64 아카이브 압축 해제 중...",
+    "gcc_check_b2": "G++ 컴파일러 설치/업데이트 시도 중...",
+    "gcc_compilation_attempt": "*** 플래그로 컴파일 시도 중:",
+    "gcc_compilation_success": "컴파일 성공, 실행 파일 실행 중...",
+    "gcc_compilation_failed": "*** 컴파일 실패, 오류:",
+    "gcc_execution_finished": "실행 성공적으로 완료.",
+    "gcc_execution_error_a1": "실행 파일 실행 중 오류 발생:",
+    "gcc_mingw_addpath": "MinGW-w64 bin 폴더가 PATH에 추가되었습니다:",
+    "gcc_compiler_installed": "G++가 성공적으로 설치/업데이트되었습니다.",
+    "gcc_found_compiler_ver": "발견된 G++ 버전:",
+    "gcc_sufficient_compiler_ver": "G++ 버전이 충분합니다.",
+    "gcc_old_compiler_ver": "G++ 버전이 너무 오래되어 업그레이드가 필요합니다.",
+    "gcc_mingw_extracted": "압축 해제 완료. MinGW가 다음 위치에 설치되었습니다:",
+    "py7zr_installed": "py7zr 패키지가 성공적으로 설치되었습니다.",
+    "py7zr_error_a1": "py7zr 패키지를 찾을 수 없어 설치 중...",
+    "csc_compiler": "C# 컴파일러 (csc)",
+    "cs_usercode_written": "사용자 C# 코드가 ***에 작성되었습니다.",
+    "csc_error_a1": "C# 컴파일러 (csc)를 찾을 수 없습니다. 설치 시도 중...\n",
+    "csc_error_a2": "CSC 컴파일러를 찾을 수 없고 설치에 실패했습니다. C# 실행 중단.",
+    "csc_autoinst_fail": "C# 컴파일러 자동 설치 실패. .NET SDK를 수동으로 설치하십시오.\n",
+    "csc_compiler_installed": "C# 컴파일러 (csc) 설치 성공.\n",
+    "csc_compiling_with": "다음으로 컴파일 중:",
+    "csc_compilation_success": "컴파일 성공.\n",
+    "csc_execution_finished": "실행 성공적으로 완료.",
+    "csc_execution_error_a1": "실행 파일 실행 시 오류 발생:",
+    "sh_platform_not_supported": "사용 중인 플랫폼은 Shell 스크립트 실행을 지원하지 않습니다.",
+    "py_error_a1_title": "Python 버전 부족",
+    "py_error_a1": "Python 3.13 이상을 설치하십시오.",
+    "py_error_a2": "Python 인터프리터를 찾을 수 없습니다.",
+    "py_error_a3": "Python 버전을 해석할 수 없습니다.",
+    "error_a1": "오류",
+    "error_a2": "파일을 열 수 없습니다",
+    "error_a3": "파일을 열 수 없습니다:\n",
+    "error_a4": "파일에 쓸 수 없습니다:\n",
+    "error_a5": "Slash Code 소스 파일을 로드할 수 없습니다. 이유:\n\n",
+    "error_c0": "폴더 버튼 업데이트 오류:",
+    "error_c1": "메뉴 레이블 업데이트 오류:",
+    "error_c2": "파일 레이블 업데이트 오류:",
+    "error_c3": "편집 레이블 업데이트 오류:",
+    "error_c4": "테마 레이블 업데이트 오류:",
+    "error_c5": "실행 레이블 업데이트 오류:",
+    "error_c6": "보기 레이블 업데이트 오류:",
+    "error_c7": "언어 레이블 업데이트 오류:",
+    "error_c8": "GUI 언어 레이블 업데이트 오류:",
+    "error_d1": "문서 코드를 실행하는 동안 예외가 발생했습니다. 이유:\n\n",
+    "error_d1_5": "문서를 쓰고 실행하는 동안 예외가 발생했습니다. 이유:\n\n",
+    "error_d2": "컴파일러가 올바르게 설치되지 않았습니다.",
+    "error_e1": "pip가 py7z 설치에 실패했습니다. 이유:",
+    "deleting_dirs": "디렉터리 삭제 중: ",
+    "directory_del_not_found": "삭제할 디렉터리를 찾을 수 없습니다.",
+    "find": "찾기",
+    "find_query": "찾기:",
+    "find_all": "모두 찾기",
+    "replace": "바꾸기",
+    "replace_query": "바꿀 내용:",
+    "replace_all": "모두 바꾸기",
+    "runner_not_found": " 찾을 수 없습니다!\n",
+    "install_suggest": "먼저 설치해 주세요.\n",
+    "instructions": "설명: ",
+    "compilation_error": "컴파일 오류:\n",
+    "opened_in_browser": "기본 브라우저에서 열림.",
+    "language_not_supported": "실행할 수 없는 언어입니다.",
+    "process_error": "프로세스 오류: ",
+    "unexpected_error": "예상치 못한 오류: ",
+    "cleanup_failed": "정리 실패: ",
+    "file": "파일",
+    "new": "새 파일",
+    "open": "열기",
+    "save": "저장",
+    "toggle_new_file_saving": "새 파일 저장 토글",
+    "clean_temp_files": "임시 파일 정리",
+    "clean_temp_directories": "임시 디렉터리 정리",
+    "fully_wipe_directories": "임시 디렉터리 완전 삭제",
+    "reboot_consolemode": "콘솔 모드에서 재부팅",
+    "exit": "종료",
+    "edit": "편집",
+    "undo": "실행 취소",
+    "redo": "다시 실행",
+    "language": "언어",
+    "theme": "테마",
+    "theme_light": "라이트",
+    "theme_dark": "다크",
+    "theme_dracula": "드라큘라",
+    "theme_monokai": "모노카이",
+    "theme_night_owl": "나이트 아울",
+    "theme_shades_of_purple": "보라색 계열",
+    "theme_high_contrast": "고대비",
+    "open_folder": "폴더 열기",
+    "changed_language_to": "언어 변경됨: ",
+    "view": "보기",
+    "zoom_in": "확대",
+    "zoom_out": "축소",
+    "show_sidebar": "사이드바 표시",
+    "hide_sidebar": "사이드바 숨기기",
+    "show_minimap": "미니맵 표시",
+    "hide_minimap": "미니맵 숨기기",
+    "show_debug_info": "디버그 정보 표시",
+    "hide_debug_info": "디버그 정보 숨기기",
+    "toggle_fullscreen": "전체 화면 전환",
+    "exit_fullscreen": "전체 화면 종료",
+    "run": "실행",
+    "run_file": "파일 실행",
+    "sc_output": "SC-출력",
+    "output_sc_title": "-- Slash Code 텍스트 에디터 | 파일 실행용 SC-출력 --",
+    "save_output_text": "출력 텍스트 저장",
+    "highlighting_as": "하이라이트 모드: ",
+    "plaintext": "일반 텍스트",
+    "python": "파이썬",
+    "javascript": "자바스크립트",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "markdown": "마크다운",
+    "renpy": "Ren'Py",
+    "shell": "Shell 스크립트",
+    "python_files": "파이썬 파일",
+    "javascript_files": "자바스크립트 파일",
+    "html_files": "HTML 파일",
+    "c_files": "C 파일",
+    "cpp_files": "C++ 파일",
+    "header_files": "헤더 파일",
+    "text_files": "텍스트 파일",
+    "cs_files": "C# 파일",
+    "css_files": "CSS 파일",
+    "markdown_files": "마크다운 파일",
+    "renpy_files": "Ren'Py 파일",
+    "shell_files": "Shell 파일",
+    "all_files": "모든 파일",
+    "binary_file_title": "바이너리 파일 감지됨",
+    "binary_file": "이 문서에서 이상한 문자가 감지되었습니다. 열어서 Slash Code가 원시 데이터를 읽도록 하시겠습니까?\n경고: 이로 인해 Slash Code가 느려질 수 있습니다.",
+    "session_loaded": "세션 로드됨:",
+    "error_b1": "파일 로드 중 오류 발생: ",
+    "error_b2": "디렉터리 로드 중 오류 발생: "
+    },
+    "ar": {
+    "gui_lang": "لغة واجهة المستخدم",
+    "msys_install": "تم تثبيت MSYS2. يرجى تثبيت MinGW عبر واجهة MSYS2: pacman -S mingw-w64-x86_64-gcc",
+    "msys_error_a1": "فشل تثبيت MinGW-w64 بنجاح:",
+    "gcc_used": "استخدام GCC:",
+    "gcc_error_a1": "فشل تثبيت G++.",
+    "gcc_error_a2": "فشل التحقق من إصدار G++:",
+    "gcc_error_b1": "لم يتم العثور على مترجم G++. تم إلغاء تشغيل C++.",
+    "gcc_error_b2": "فشل تثبيت مترجم MinGW.\n",
+    "cpp_usercode_written": "تم كتابة كود C++ الخاص بالمستخدم إلى ***.",
+    "gcc_check_a1": "التحقق من وجود مترجم G++ الحالي...",
+    "gcc_check_a2": "جاري تنزيل وتثبيت MinGW-w64...",
+    "gcc_check_a3": "جاري تنزيل MinGW-w64 من ***...",
+    "gcc_check_a4": "*** ميجابايت تم تنزيلها حتى الآن...",
+    "gcc_check_a4_5": "تم تنزيل *** ميجابايت إجمالاً.",
+    "gcc_check_b1": "جاري استخراج أرشيف MinGW-w64...",
+    "gcc_check_b2": "محاولة تثبيت/تحديث مترجم G++...",
+    "gcc_compilation_attempt": "محاولة الترجمة مع الخيار ***:",
+    "gcc_compilation_success": "تمت الترجمة بنجاح، يجري تشغيل الملف القابل للتنفيذ...",
+    "gcc_compilation_failed": "فشلت الترجمة ل*** مع وجود أخطاء:",
+    "gcc_execution_finished": "انتهى التنفيذ بنجاح.",
+    "gcc_execution_error_a1": "حدث خطأ أثناء محاولة تشغيل الملف القابل للتنفيذ:",
+    "gcc_mingw_addpath": "تمت إضافة مجلد MinGW-w64 bin إلى PATH:",
+    "gcc_compiler_installed": "تم تثبيت/تحديث G++ بنجاح.",
+    "gcc_found_compiler_ver": "تم العثور على إصدار G++:",
+    "gcc_sufficient_compiler_ver": "إصدار G++ كافٍ.",
+    "gcc_old_compiler_ver": "إصدار G++ لديك قديم جداً ويحتاج إلى التحديث.",
+    "gcc_mingw_extracted": "اكتمل الاستخراج. تم تثبيت MinGW في:",
+    "py7zr_installed": "تم تثبيت حزمة py7zr بنجاح.",
+    "csc_compiler": "مترجم C# (csc)",
+    "cs_usercode_written": "تم كتابة كود C# الخاص بالمستخدم إلى ***.",
+    "csc_error_a1": "مترجم C# (csc) غير موجود. جارٍ المحاولة للتثبيت...\n",
+    "csc_error_a2": "لم يتم العثور على مترجم CSC وفشل التثبيت. تم إيقاف تشغيل C#.",
+    "csc_autoinst_fail": "فشل التثبيت التلقائي لمترجم C#. يرجى تثبيت .NET SDK يدوياً.\n",
+    "csc_compiler_installed": "تم تثبيت مترجم C# (csc) بنجاح.\n",
+    "csc_compiling_with": "جارٍ الترجمة باستخدام:",
+    "csc_compilation_success": "تمت الترجمة بنجاح.\n",
+    "csc_execution_finished": "انتهى التنفيذ بنجاح.",
+    "csc_execution_error_a1": "حدث خطأ أثناء محاولة تشغيل الملف القابل للتنفيذ:",
+    "sh_platform_not_supported": "منصتك غير مدعومة لتشغيل سكريبتات Shell Script.",
+    "py_error_a1_title": "إصدار Python غير كافٍ",
+    "py_error_a1": "يرجى تثبيت Python 3.13 أو أحدث.",
+    "py_error_a2": "تعذر العثور على مفسر Python.",
+    "py_error_a3": "تعذر تحليل إصدار Python.",
+    "error_a1": "خطأ",
+    "error_a2": "تعذر فتح الملف",
+    "error_a3": "تعذر فتح الملف:\n",
+    "error_a4": "تعذر الكتابة إلى الملف:\n",
+    "error_a5": "تعذر تحميل ملف مصدر Slash Code. السبب:\n\n",
+    "error_c0": "خطأ في تحديث زر المجلد:",
+    "error_c1": "خطأ في تحديث وسم القائمة:",
+    "error_c2": "خطأ في تحديث وسم الملف:",
+    "error_c3": "خطأ في تحديث وسم التحرير:",
+    "error_c4": "خطأ في تحديث وسم السمة:",
+    "error_c5": "خطأ في تحديث وسم التشغيل:",
+    "error_c6": "خطأ في تحديث وسم العرض:",
+    "error_c7": "خطأ في تحديث وسم اللغة:",
+    "error_c8": "خطأ في تحديث وسم لغة الواجهة:",
+    "error_d1": "حدث استثناء أثناء محاولة تنفيذ كود المستند. السبب هو:\n\n",
+    "error_d1_5": "حدث استثناء أثناء محاولة الكتابة والتنفيذ للمستند. السبب هو:\n\n",
+    "error_d2": "فشل تثبيت المترجم بشكل صحيح.",
+    "deleting_dirs": "جار حذف المجلد/المجلدات:",
+    "error_e1": "فشل pip في تثبيت py7z. السبب:",
+    "directory_del_not_found": "لم يتم العثور على أي مجلدات للحذف.",
+    "find": "بحث",
+    "find_query": "بحث عن:",
+    "find_all": "البحث الكل",
+    "replace": "استبدال",
+    "replace_query": "استبدال بـ:",
+    "replace_all": "استبدال الكل",
+    "runner_not_found": " غير موجود!\n",
+    "install_suggest": "يرجى تثبيته أولاً.\n",
+    "instructions": "تعليمات: ",
+    "compilation_error": "خطأ في الترجمة:\n",
+    "opened_in_browser": "تم الفتح في المتصفح الافتراضي.",
+    "language_not_supported": "اللغة غير مدعومة للتنفيذ.",
+    "process_error": "خطأ في العملية: ",
+    "unexpected_error": "خطأ غير متوقع: ",
+    "cleanup_failed": "فشل التنظيف: ",
+    "file": "ملف",
+    "new": "جديد",
+    "open": "فتح",
+    "save": "حفظ",
+    "toggle_new_file_saving": "تبديل حفظ الملف الجديد",
+    "clean_temp_files": "تنظيف الملفات المؤقتة",
+    "clean_temp_directories": "تنظيف الأدلة المؤقتة بالكامل",
+    "fully_wipe_directories": "مسح الأدلة المؤقتة بالكامل",
+    "reboot_consolemode": "إعادة التشغيل في وضع الكونسول",
+    "exit": "خروج",
+    "edit": "تحرير",
+    "undo": "تراجع",
+    "redo": "إعادة",
+    "language": "اللغة",
+    "theme": "الثيم",
+    "theme_light": "فاتح",
+    "theme_dark": "داكن",
+    "theme_dracula": "دراكولا",
+    "theme_monokai": "مونوكاي",
+    "theme_night_owl": "البومة الليلية",
+    "theme_shades_of_purple": "درجات اللون الأرجواني",
+    "theme_high_contrast": "تباين عالي",
+    "open_folder": "فتح المجلد",
+    "changed_language_to": "تم تغيير اللغة إلى ",
+    "view": "عرض",
+    "zoom_in": "تكبير",
+    "zoom_out": "تصغير",
+    "show_sidebar": "إظهار الشريط الجانبي",
+    "hide_sidebar": "إخفاء الشريط الجانبي",
+    "show_minimap": "إظهار الخريطة المصغرة",
+    "hide_minimap": "إخفاء الخريطة المصغرة",
+    "show_debug_info": "إظهار معلومات التصحيح",
+    "hide_debug_info": "إخفاء معلومات التصحيح",
+    "toggle_fullscreen": "تبديل ملء الشاشة",
+    "exit_fullscreen": "خروج من ملء الشاشة",
+    "run": "تشغيل",
+    "run_file": "تشغيل الملف",
+    "sc_output": "مخرجات SC",
+    "output_sc_title": "-- محرر نصوص Slash Code | مخرجات SC لتشغيل الملفات --",
+    "save_output_text": "حفظ نص المخرجات",
+    "highlighting_as": "تظليل كالتالي: ",
+    "plaintext": "نص عادي",
+    "python": "Python",
+    "javascript": "JavaScript",
+    "css": "CSS",
+    "html": "HTML",
+    "cpp": "C++",
+    "cs": "C#",
+    "markdown": "Markdown",
+    "renpy": "Ren'Py",
+    "shell": "نص Shell",
+    "python_files": "ملفات Python",
+    "javascript_files": "ملفات JavaScript",
+    "html_files": "ملفات HTML",
+    "c_files": "ملفات C",
+    "cpp_files": "ملفات C++",
+    "header_files": "ملفات الرأس",
+    "text_files": "ملفات نصية",
+    "cs_files": "ملفات C#",
+    "css_files": "ملفات CSS",
+    "markdown_files": "ملفات Markdown",
+    "renpy_files": "ملفات Ren'Py",
+    "renpy_files": "ملفات Shell",
+    "all_files": "جميع الملفات",
+    "binary_file_title": "تم اكتشاف ملف ثنائي",
+    "binary_file": "تم اكتشاف أحرف غير مألوفة في هذا المستند. هل ترغب في فتحه وقراءة البيانات الخام بواسطة Slash Code؟\nتحذير: قد يبطئ هذا البرنامج.",
+    "session_loaded": "تم تحميل الجلسة:",
+    "error_b1": "خطأ أثناء تحميل الملف: ",
+    "error_b2": "خطأ أثناء تحميل الدليل: "
+    }
 }
 
 class GUITranslate:
@@ -500,6 +1618,9 @@ class GUITranslate:
         self.load_lang()
         
     def load_lang(self):
+        """
+        Loads the language that's been saved from the previous session inside the `.json` language file.
+        """
         slash_dir = os.path.expanduser('~/.slashcode')
         os.makedirs(os.path.join(slash_dir, "lang"), exist_ok=True)
         lang_file = os.path.join(slash_dir, f'lang/{self.lang}.json')
@@ -513,9 +1634,15 @@ class GUITranslate:
         self.data = GUILANGS.get(self.lang, {})
                 
     def get(self, key):
+        """
+        Returns the key value for the current language key.
+        """
         return self.data.get(key, key)
     
     def set_language(self, lang):
+        """
+        Sets the language using `load_lang()` and passes `self.lang` to the `lang` parameter.
+        """
         self.lang = lang
         self.load_lang()
         
@@ -534,7 +1661,7 @@ guilang_menu = tk.Menu(menu, tearoff=0)
 file_index = edit_index = theme_index = view_index = run_index = language_index = guilang_index = None
 
 def highlight_language_change():
-    print(translate.get("highlighting_as") + f"{language_var.get()}")
+    print(translate.get("highlighting_as") + f"{language_var.get().replace("plaintext", translate.get('plaintext').lower())}")
     if os.path.getsize(current_file) > 80000:
         root.after(150, lambda: highlight_document_in_chunks(chunk_size=100))
     else:
@@ -576,9 +1703,14 @@ def on_lang_change():
     lang_map = {
         "en": "English",
         "nl": "Nederlands",
+        "de": "Deutsch",
         "es": "Español",
+        "it": "Italiano",
         "fr": "Français",
-        "jp": "日本語"
+        "jp": "日本語",
+        "zh": "中文",
+        "ko": "한국인",
+        "ar": "عربي"
     }
     lang = lang_var.get()
     lang_name = lang_map.get(lang, lang)
@@ -615,7 +1747,10 @@ def update_ui_text():
         file_menu.entryconfig(3, label=translate.get("save"))
         file_menu.entryconfig(5, label=translate.get("toggle_new_file_saving"))
         file_menu.entryconfig(6, label=translate.get("clean_temp_files"))
-        file_menu.entryconfig(8, label=translate.get("exit"))
+        file_menu.entryconfig(7, label=translate.get("clean_temp_directories"))
+        file_menu.entryconfig(8, label=translate.get("fully_wipe_directories"))
+        file_menu.entryconfig(10, label=translate.get("reboot_consolemode"))
+        file_menu.entryconfig(12, label=translate.get("exit"))
     except Exception as e:
         print(translate.get("error_c2"), e)
 
@@ -645,8 +1780,10 @@ def update_ui_text():
         view_menu.entryconfig(4, label=translate.get("hide_sidebar"))
         view_menu.entryconfig(5, label=translate.get("show_minimap"))
         view_menu.entryconfig(6, label=translate.get("hide_minimap"))
-        view_menu.entryconfig(8, label=translate.get("toggle_fullscreen"))
-        view_menu.entryconfig(9, label=translate.get("exit_fullscreen"))
+        view_menu.entryconfig(8, label=translate.get("show_debug_info"))
+        view_menu.entryconfig(9, label=translate.get("hide_debug_info"))
+        view_menu.entryconfig(11, label=translate.get("toggle_fullscreen"))
+        view_menu.entryconfig(12, label=translate.get("exit_fullscreen"))
     except Exception as e:
         print(translate.get("error_c5"), e)
 
@@ -665,6 +1802,7 @@ def update_ui_text():
         language_menu.entryconfig(6, label=translate.get("cs"))
         language_menu.entryconfig(7, label=translate.get("markdown"))
         language_menu.entryconfig(8, label=translate.get("renpy"))
+        language_menu.entryconfig(9, label=translate.get("shell"))
     except Exception as e:
         print(translate.get("error_c7"), e)
         
@@ -677,9 +1815,14 @@ def update_ui_text():
     try:
         guilang_menu.entryconfig(0, label="English")
         guilang_menu.entryconfig(1, label="Nederlands")
-        guilang_menu.entryconfig(2, label="Español")
-        guilang_menu.entryconfig(3, label="Français")
-        guilang_menu.entryconfig(4, label="日本語")
+        guilang_menu.entryconfig(2, label="Deutsch")
+        guilang_menu.entryconfig(3, label="Español")
+        guilang_menu.entryconfig(4, label="Italiano")
+        guilang_menu.entryconfig(5, label="Français")
+        guilang_menu.entryconfig(6, label="日本語")
+        guilang_menu.entryconfig(7, label="中文")
+        guilang_menu.entryconfig(8, label="한국인")
+        guilang_menu.entryconfig(9, label="عربي")
     except Exception as e:
         print(translate.get("error_c8"), e)
 
@@ -711,7 +1854,7 @@ renpy_kw = {
     'insensitive_selected_hover', 'selected_activate', 'selected_deactivate', 'selected_insensitive',
     'selected_insensitive_idle', 'selected_insensitive_hover', 'window show', 'window hide', 'window auto', 
     'window none', 'window', 'voice', 'queue', 'extend',
-    'renpy', 'define', 'default', 'config', 'persistent', 'store', 'gui', 'style', 'theme'
+    'renpy', 'define', 'default', 'config', 'persistent', 'store', 'gui', 'style', 'theme', 'has'
     }
 renpy_kw.update(py_keywords)
 
@@ -723,7 +1866,7 @@ LANGUAGE_KEYWORDS = {
     'finally', 'for', 'function', 'if', 'implements', 'import', 'in', 'instanceof',
     'interface', 'let', 'new', 'null', 'package', 'private', 'protected', 'public',
     'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof',
-    'var', 'void', 'while', 'with', 'yield', 'async', 'arguments', 'eval'
+    'var', 'void', 'while', 'with', 'yield', 'async', 'arguments', 'eval', '=>'
     },
     'cpp': {
         'alignas', 'alignof', 'and', 'and_eq', 'asm', 'auto', 'bitand', 'bitor', 'bool',
@@ -764,7 +1907,23 @@ LANGUAGE_KEYWORDS = {
     'struct', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort',
     'using', 'virtual', 'void', 'volatile', 'while'
     },
-    'renpy': renpy_kw
+    'renpy': renpy_kw,
+    'shell': {
+    '!', '[', ']', '{', '}', 'case', 'coproc', 'do', 'done', 'elif',
+    'else', 'esac', 'fi', 'for', 'function', 'if', 'in', 'select',
+    'then', 'until', 'while', 'time', 'declare', 'local', 'readonly', 'return', 'exit',
+    'break', 'continue', 'export', 'readonly', 'shift', 'getopts', 'eval', 'exec', 'source', '.',
+    'test', 'let', 'true', 'false', 'trap', 'kill', 'wait', 'read', 'pwd', 'cd',
+    'pushd', 'popd', 'dirs', 'type', 'command', 'jobs', 'fg', 'bg', 'disown', 'echo',
+    'help', 'alias', 'unalias', 'set', 'umask', 'ulimit', 'enable', ':', 'declare', 'typeset',
+    'set', 'pushd', 'popd', 'dirs', 'jobs', 'fg', 'bg', 'disown', 'help', 'alias', 'unalias',
+    'enable', 'umask', 'ulimit', 'type', 'command'
+    }
+}
+SHELL_TEST_OPERATORS = {
+    '-z', '-n', '-d', '-e', '-f', '-r', '-w', '-x', '-s', '-l', '-L', '-h',
+    '-b', '-c', '-p', '-S', '-t', '-O', '-G', '-k', '-u', '-g', 
+    '-nt', '-ot', '-ef', '-eq', '-ne', '-lt', '-le', '-gt', '-ge', '-a', '-o'
 }
 
 renpy_fn = {
@@ -840,9 +1999,10 @@ LANGUAGE_FUNCS = {
     },
     'markdown': {
         '#', '##', '###', '####', '#####', '######', '-', '*', '+', '>', 
-        '`', '```'
+        '`', '```', '_', '__'
     },
-    'renpy': renpy_fn
+    'renpy': renpy_fn,
+    'shell': set()
 }
 
 LANGUAGE_TYPES = {
@@ -864,7 +2024,8 @@ LANGUAGE_TYPES = {
     "markdown": set(),
     "renpy": {
         "int", "float", "str", "bool", "list", "tuple", "dict", "set", "object", "bytes"
-    }
+    },
+    "shell": set()
 }
 
 html_attrs = {
@@ -1280,11 +2441,22 @@ def highlight_document_in_chunks(chunk_size=100):
             root.after(10, lambda: highlight_chunk(end_line + 1))
 
     highlight_chunk()
+    
+def is_binary_file(filepath):
+    with open(filepath, 'rb') as f:
+        chunk = f.read(1024)
+        if b'\0' in chunk: # If it contains any NUL bytes, it's likely binary.
+            return True
+        text_characters = bytearray({7,8,9,10,12,13,27} | set(range(0x20, 0x100)))
+        non_text = chunk.translate(bytearray.maketrans(b'', b''), text_characters)
+        return bool(non_text)
 
 current_file = ""
 
 def new_file(event=None):
     text.delete(1.0, tk.END)
+    language_var.set('plaintext')
+    highlight_language_change()
     update_line_numbers()
     root.title("Slash Code")
 
@@ -1292,8 +2464,28 @@ def load_file(path):
     def worker():
         try:
             file_size = os.path.getsize(path)
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            if is_binary_file(path):
+                choice = messagebox.askokcancel(translate.get("binary_file_title"), translate.get("binary_file"), icon='warning')
+                if choice:
+                    with open(path, 'rb') as f:
+                        if language_var.get() != "plaintext":
+                            language_var.set('plaintext')
+                            highlight_language_change()    
+                        content = f.read()
+                else:
+                    content = ''
+                    new_file()
+                    root.title("Slash Code")
+            else:
+                for enc in encodings:
+                    try:
+                        with open(path, 'r', encoding=enc, errors='replace') as f:
+                            content = f.read()
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        root.after(0, show_error, e)
 
             root.after(0, lambda: update_gui(path, content, file_size))
         except Exception as e:
@@ -1315,6 +2507,7 @@ def open_file(event=None):
         (translate.get("css_files"), "*.css"),
         (translate.get("markdown_files"), "*.md *.markdown"),
         (translate.get("renpy_files"), "*.rpy"),
+        (translate.get("shell_files"), "*.sh *.bash *.zsh"),
         (translate.get("all_files"), "*.*"),
     ]
     file_path = filedialog.askopenfilename(filetypes=filetypes)
@@ -1375,10 +2568,13 @@ def save_file(event=None):
         filetypes = [(translate.get("cpp_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
     elif language == "markdown":
         ext = ".md"
-        filetypes = [(translate.get("markdown_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
+        filetypes = [(translate.get("markdown_files"), "*.md *.markdown"), (translate.get("all_files"), "*.*")]
     elif language == "renpy":
         ext = ".rpy"
-        filetypes = [(translate.get("renpy_files"), "*.cpp"), (translate.get("all_files"), "*.*")]
+        filetypes = [(translate.get("renpy_files"), "*.rpy"), (translate.get("all_files"), "*.*")]
+    elif language == "shell":
+        ext = ".sh"
+        filetypes = [(translate.get("shell_files"), "*.sh *.bash *.zsh"), (translate.get("all_files"), "*.*")]
     else:
         ext = ".txt"
         filetypes = [(translate.get("text_files"), "*.txt"), (translate.get("all_files"), "*.*")]
@@ -1391,8 +2587,19 @@ def save_file(event=None):
     )
 
     if file:
-        with open(file, 'w', encoding='utf-8') as f:
-            f.write(text.get(1.0, tk.END))
+        if os.path.isfile(file) and is_binary_file(file):
+            with open(file, 'wb') as f:
+                f.write(text.get(1.0, tk.END).encode('utf-8'))
+        else:
+            for enc in encodings:
+                    try:
+                        with open(path, 'w', encoding=enc, errors='replace') as f:
+                            f.write(text.get(1.0, tk.END))
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        root.after(0, show_error, e)
         root.title(f"Slash Code - {os.path.basename(file)}")
         
 def get_language(file_path):
@@ -1412,6 +2619,8 @@ def get_language(file_path):
         return 'markdown'
     elif file_path.endswith('.rpy'):
         return 'renpy'
+    elif file_path.endswith('.sh') or file_path.endswith('.bash') or file_path.endswith('.zsh'):
+        return 'shell'
     else:
         return 'plaintext'
     
@@ -1434,7 +2643,11 @@ def guess_language_from_content(content):
     if any(keyword in content for keyword in ('function(', 'console.log', 'const ', 'let ', 'var ')):
         return 'javascript'  
     if any(keyword in content for keyword in ('{', '}', ';', ':', 'color', 'background', 'font', 'margin', 'padding')) and content.strip().endswith('}'):
-        return 'css'  
+        return 'css'
+    if any(keyword in content for keyword in ('init', 'define', 'transform', 'style', 'jump', 'call')):
+        return 'renpy'
+    if any(keyword in content for keyword in ('kill', 'wait', 'echo', 'fi', 'esac', 'trap')):
+        return 'shell'
     return 'plaintext'
 
 def highlight_line(event=None, targ=None):
@@ -1499,7 +2712,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
         return any(s <= idx < e for s, e in string_spans)
 
     # --- Comments ---
-    if language in ("python", "renpy"):
+    if language in ("python", "renpy", "shell"):
         lines = content.split('\n')
         current_pos = 0
         for line in lines:
@@ -1601,6 +2814,12 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
                     esc_start = s + esc.start()
                     esc_end = s + esc.end()
                     target.tag_add("escape", f"{region_start}+{esc_start}c", f"{region_start}+{esc_end}c")
+                    
+    # --- Test Flags (-z, -n, -d, etc.) ---
+    if language == "shell":
+        for match in re.finditer(r"\b" + "|".join(map(re.escape, SHELL_TEST_OPERATORS)) + r"\b", content):
+            if not is_in_string_or_comment(match.start()):
+                target.tag_add("pointer", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
                  
     if language == "markdown":
         # --- Headings ---
@@ -1643,6 +2862,20 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             for match in re.finditer(r"\b(" + "|".join(map(re.escape, builtins)) + r")\b", content):
                 if not is_in_string_or_comment(match.start()):
                     target.tag_add("builtin", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
+    
+    if language == "renpy":
+        # --- Screen/Label Names (tag 'classname', because they use the same attributes as a Python class.)---
+        for match in re.finditer(r'\bscreen\s+([A-Za-z_][A-Za-z0-9_]*)', content):
+            name_start = match.start(1)
+            name_end = match.end(1)
+            if not is_in_string_or_comment(name_start):
+                target.tag_add("classname", f"{region_start}+{name_start}c", f"{region_start}+{name_end}c")
+        
+        # --- One-line Python Statements ($ (...), used with the same tag as the semicolon) ---
+        for match in re.finditer('$', content):
+            s, e = match.start(), match.end()
+            if not is_in_string_or_comment(s):
+                target.tag_add("semicolon", f"{region_start}+{s}c", f"{region_start}+{e}c")
             
     # --- Semicolons (C++, C#, CSS, JavaScript) ---
     for match in re.finditer(r';', content):
@@ -1704,7 +2937,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             target.tag_add("member", f"{region_start}+{member_start}c", f"{region_start}+{member_end}c")
 
     # --- Dunder Methods ---
-    for match in re.finditer(r'\b(__\w+__)\b', content):
+    for match in re.finditer(r'\b(__(?=\w*[^_])[\w]+__)\b', content):
         s, e = match.start(), match.end()
         target.tag_add("dunder", f"{region_start}+{s}c", f"{region_start}+{e}c")
 
@@ -1715,18 +2948,21 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             target.tag_add("integer", f"{region_start}+{s}c", f"{region_start}+{e}c")
             
     # --- f-strings (Python, Ren'Py for "[]" and C# for $"{}") ---
-    if language in ("python", "renpy", "cs"):
+    if language in ("python", "renpy", "cs", "cpp"):
         if language == "python":
-            string_pattern = r'(?P<prefix>[fFrR]{1,2})?(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+            string_pattern = r"(?P<prefix>[fFrRbBuU]{0,2})?(?P<quote>['\"]{1,3})(?P<body>.*?)(?P=quote)"
         elif language == "renpy":
-            string_pattern = r'(?P<prefix>[fFrR]{1,2})?(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+            string_pattern = r"(?P<prefix>[fFrRbBuU]{1,2})?(?P<quote>['\"])(?P<body>.*?)(?P=quote)"
         elif language == "cs":
-            string_pattern = r'(?P<prefix>[\$]{1,2})?(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+            string_pattern = r"(?P<prefix>\$@?|@\$(?=[\"']))?(?P<quote>['\"])(?P<body>.*?)(?P=quote)"
+        elif language == "cpp":
+            string_pattern = r'(?P<quote>["\'])(?P<body>.*?)(?P=quote)'
+                
         for f_match in re.finditer(string_pattern, content, re.DOTALL):
             if is_in_string_or_comment(f_match.start()):
                 continue
   
-            prefix = f_match.group('prefix') or ''
+            prefix = f_match.group('prefix') if 'prefix' in f_match.groupdict() and f_match.group('prefix') else ''
             quote = f_match.group('quote')
             body = f_match.group('body')
 
@@ -1747,11 +2983,15 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             elif language == "python":
                 if 'f' not in prefix.lower():
                     continue
-                interpolation_pattern = r'(\{.*?\})'
+                interpolation_pattern = r'\{(?:[^{}]|\{[^{}]*\})*\}'
             elif language == "cs":
                 if '$' not in prefix:
                     continue
-                interpolation_pattern = r'(\{.*?\})'
+                interpolation_pattern = r'\{(?:[^{}]|\{[^{}]*\})*\}'
+            elif language == "cpp":
+                if not re.search(r'(std|fmt)::format\s*\(', content):
+                    continue
+                interpolation_pattern = r'\{(?:[^{}]|\{[^{}]*\})*\}'
             else:
                 interpolation_pattern = ''
 
@@ -1768,6 +3008,9 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
                     string_spans.append((lit_start, lit_end))
                     target.tag_add("string", f"{region_start}+{lit_start}c", f"{region_start}+{lit_end}c")
                     current_pos = lit_end
+                    if language in ("renpy", "python"):
+                        if expr.startswith('{{') and expr.endswith('}}'):
+                            continue
     
                 if expr and expr[0] in ('{', '['):
                     expr_start = current_pos
@@ -1802,7 +3045,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
                         n_end = inner_start + num_match.end()
                         target.tag_add("number", f"{region_start}+{n_start}c", f"{region_start}+{n_end}c")
 
-                    for dunder_match in re.finditer(r'\b(__\w+__)\b', inner_text):
+                    for dunder_match in re.finditer(r'\b(__(?=\w*[^_])[\w]+__)\b|![rRsSaA]', inner_text):
                         d_start = inner_start + dunder_match.start()
                         d_end = inner_start + dunder_match.end()
                         target.tag_add("dunder", f"{region_start}+{d_start}c", f"{region_start}+{d_end}c")
@@ -1844,7 +3087,7 @@ def highlight(target=None, event=None, full_document=False, region_start=None, r
             target.tag_add("variable", f"{region_start}+{match.start()}c", f"{region_start}+{match.end()}c")
     
     # --- Tooltips ---
-    if language in ("python", "renpy"):
+    if language in ("python", "cpp", "cs", "renpy", "shell"):
         for match in re.finditer(
         r'\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(?:->\s*([^:]+?))?:', content
         ):
@@ -1954,7 +3197,6 @@ themes = {
     'escape': '#FF0000', 'semicolon': '#FFFFFF', 'preprocessor': "#C800C8", 'preprocessor_rest': '#AAAAAA',
     'html_tag': '#00FFFF', 'html_attr': '#FFA500', 'constant': '#FF4500', 'template': '#00FF00', 'operator': '#FFFF00',
 },
-
 }
         
 def auto_indent(event):
@@ -2011,10 +3253,12 @@ frame = tk.Frame(root)
 frame.pack(fill=tk.BOTH, expand=True)
 
 font_size = 12
+jp_font = tk.font.Font(family="Noto Sans JP", size=font_size)
+en_font = tk.font.Font(family="Consolas", size=font_size)
 if lang_var.get() == "jp":
-    font = ("NSJP.ttf", font_size)
+    font = jp_font
 else:
-    font = ("Consolas", font_size)
+    font = en_font
 
 line_numbers = tk.Text(
     frame,
@@ -2031,98 +3275,124 @@ line_numbers = tk.Text(
 current_theme = 'light'
 theme_var = tk.StringVar(value=current_theme)
 
+def apply_font_tags():
+    content = text.get("1.0", "end-1c")
+    text.tag_remove("jp", "1.0", "end")
+    text.tag_remove("en", "1.0", "end")
+
+    for i, char in enumerate(content):
+        index = f"1.0+{i}c"
+        if re.match(r'[\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]', char):
+            text.tag_add("jp", index, f"{index}+1c")
+        else:
+            text.tag_add("en", index, f"{index}+1c")
+
 line_numbers.pack(side=tk.LEFT, fill=tk.Y)
 text = scrolledtext.ScrolledText(frame, font=font, undo=True, wrap=tk.WORD)
 text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 text.bind("<Return>", auto_indent)
 text.bind("}", handle_closing_brace)
 
-minimap_frame = tk.Frame(root, width=0, bg=themes[theme_var.get()]['bg'])
-minimap_frame.place(relx=0.9905, rely=0.5575, anchor="ne")
+sidebar = tk.Frame(frame, width=200, bg=themes[theme_var.get()]['bg'])
+sidebar.pack(side=tk.RIGHT, fill=tk.Y)
+
+create_sidebar_buttons()
+
+file_listbox = tk.Listbox(sidebar, width=30, bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'], selectbackground=themes[theme_var.get()]['keyword'])
+
+minimap_frame = tk.Frame(sidebar, bg=themes[theme_var.get()]['bg'])
+minimap_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 minimap_font = tk.font.Font(family="Consolas", size=4)
 def set_minimap():
     global minimap
-    minimap = tk.Text(minimap_frame, font=minimap_font, width=62, height=60, state='disabled', bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'])
+    minimap = tk.Text(minimap_frame, font=minimap_font, width=70, height=50, state='disabled', wrap=tk.NONE, bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'])
 set_minimap()
-minimap.pack(fill=tk.Y, expand=True)
+minimap.pack(side=tk.RIGHT, fill=tk.BOTH)
+
+tree = ttk.Treeview(sidebar)
+tree.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+scrollbar = tk.Scrollbar(tree, orient="vertical", command=tree.yview)
+scrollbar_h_container = tk.Frame(tree, height=15)
+scrollbar_h_container.pack(side=tk.BOTTOM, fill=tk.X)
+scrollbar_hz = tk.Scrollbar(scrollbar_h_container, orient="horizontal", command=tree.xview, width=15)
+tree.configure(yscrollcommand=scrollbar.set)
+tree.configure(xscrollcommand=scrollbar_hz.set)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+scrollbar_hz.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
 
 for tag, color in themes[theme_var.get()].items():
     if tag in ["bg", "fg", "line_numbers", "cursor"]: continue
     minimap.tag_configure(tag, foreground=color)
-    
-def highlight_minimap():
-    content = text.get("1.0", "end-1c")
-    minimap.config(state='normal')
-    minimap.delete("1.0", "end")
-    minimap.insert("1.0", content)
-    minimap.config(state='disabled')
-    minimap.config(state='normal')
-    highlight(target=minimap, content=content)
-    minimap.config(state='disabled')
 
+minimap_visible = [True]
 def hide_minimap():
-    minimap_frame.place_forget()
-    minimap.pack_forget()
-    
+    minimap_frame.pack_forget()
+    minimap_visible[0] = True
+    tree.pack_configure(expand=True)
+    tree.update_idletasks()
+    scrollbar_hz.pack_forget()
+    scrollbar_hz.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+    tree.configure(xscrollcommand=scrollbar_hz.set)
+    file_listbox.pack_configure(expand=True)
+
 def show_minimap():
-    minimap_frame.place(relx=0.9905, rely=0.5575, anchor="ne")
-    minimap.pack(fill=tk.Y, expand=True)
-    
+    file_listbox.pack(fill=tk.BOTH, expand=True)
+    minimap_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, before=tree)
+    tree.pack_configure(expand=True)
+    tree.update_idletasks()
+    scrollbar_hz.pack_forget()
+    scrollbar_hz.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+    tree.configure(xscrollcommand=scrollbar_hz.set)
+    minimap_visible[0] = False
+
 def update_minimap(event=None):
     global minimap
     if not minimap:
-        return 
+        return
     minimap.config(state='normal')
     minimap.delete('1.0', tk.END)
     minimap.insert('1.0', text.get('1.0', tk.END))
     minimap.config(state='disabled')
-    
+
 def on_text_scroll(*args):
-    line_numbers.yview_moveto(text.yview()[0])
-    minimap.yview_moveto(text.yview()[0])
+    line_numbers.yview_moveto(float(args[0]))
+    
+    text_lines = int(text.index('end-1c').split('.')[0])
+    minimap_lines = int(minimap.index('end-1c').split('.')[0])
+    if text_lines > 0 and minimap_lines > 0:
+        ratio = minimap_lines / text_lines
+        minimap.yview_moveto(float(args[0]) * ratio)
     text.vbar.set(*args)
 
 text.config(yscrollcommand=on_text_scroll)
 
-def on_scroll(event=None):
+def on_scroll(*args):
+    text.yview(*args)
     line_numbers.yview_moveto(text.yview()[0])
     minimap.yview_moveto(text.yview()[0])
-    return None
-
-def sync_scroll(first, last):
-    line_numbers.yview_moveto(text.yview()[0])
-    minimap.yview_moveto(text.yview()[0])
-    return None
-
-text['yscrollcommand'] = sync_scroll
+    update_line_numbers()
+    return "break"
 
 def on_minimap_click(event):
     height = minimap.winfo_height()
     clicked_fraction = event.y / height
     text.yview_moveto(clicked_fraction)
+    update_line_numbers()
     update_minimap()
+
 
 minimap.bind("<Button-1>", on_minimap_click)
 text.bind("<MouseWheel>", on_scroll)
 text.bind("<Button-4>", on_scroll)
 text.bind("<Button-5>", on_scroll)
 
-sidebar = tk.Frame(frame, width=200, bg=themes[theme_var.get()]['bg'])
-sidebar.pack(side=tk.RIGHT, fill=tk.Y)
-
-create_sidebar_buttons()
-
-tree = ttk.Treeview(sidebar)
-tree.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-
-scrollbar = tk.Scrollbar(sidebar, orient="vertical", command=tree.yview)
-tree.configure(yscrollcommand=scrollbar.set)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
 def zoom_in(event=None):
     global font_size, font
     font_size = min(36, font_size + 2)
+    sidebar.config(width=int(200 - font_size * 1.5))
+    minimap.config(width=int(70 - font_size * 1.2))
     font = ("Consolas", font_size)
+    print(f"Font size: {font_size}")
     text.config(font=font)
     line_numbers.config(font=font)
     update_line_numbers()
@@ -2130,7 +3400,10 @@ def zoom_in(event=None):
 def zoom_out(event=None):
     global font_size, font
     font_size = max(8, font_size - 2)
+    sidebar.config(width=int(200 - font_size * 1.2))
+    minimap.config(width=int(70 - font_size * 1.5))
     font = ("Consolas", font_size)
+    print(f"Font size: {font_size}")
     text.config(font=font)
     line_numbers.config(font=font)
     update_line_numbers()
@@ -2140,9 +3413,11 @@ text.bind('<<Modified>>', lambda e: (update_minimap(), text.edit_modified(0)))
 def on_key_and_scroll(event=None):
     on_key_release()
     on_scroll()
+    apply_font_tags()
     return None
 
 def on_mousewheel(event=None):
+    update_line_numbers()
     on_scroll()
     return None
 
@@ -2155,7 +3430,7 @@ def on_configure(event=None):
     return None
 
 def on_paste(event=None):
-    root.after(10, highlight_full_document)
+    root.after(100, lambda: highlight_document_in_chunks(chunk_size=100))
     return None
 
 def open_selected_file(event=None):
@@ -2174,9 +3449,13 @@ def open_selected_file(event=None):
                 else:
                     root.after(10, highlight_full_document)
             except Exception as e:
-                messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
-
-file_listbox = tk.Listbox(sidebar, width=30, bg=themes[theme_var.get()]['bg'], fg=themes[theme_var.get()]['fg'], selectbackground=themes[theme_var.get()]['keyword'])
+                try:
+                    with open(fpath, "rb") as f:
+                        text.delete("1.0", tk.END)
+                        text.insert(tk.END, f.read())
+                except Exception as e:
+                    messagebox.showerror(translate.get("error_a1"), translate.get("error_a2") + f"\n{e}")
+                    
 file_listbox.bind("<<ListboxSelect>>", open_selected_file)
 file_listbox.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
@@ -2187,7 +3466,7 @@ def insert_nodes(parent, path):
             isdir = os.path.isdir(abspath)
             node = tree.insert(parent, "end", text=name, open=False, values=[abspath])
             if isdir:
-                tree.insert(node, "end")  # Dummy child
+                tree.insert(node, "end")
     except Exception:
         pass
 
@@ -2226,16 +3505,6 @@ def open_folder(folder=None, skip_ask=False):
         globals()['FOLDER'] = folder
 
 open_folder_btn.config(command=open_folder)
-
-def on_open_node(event):
-    node = tree.focus()
-    path = get_full_path(node)
-    children = tree.get_children(node)
-    if children:
-        first_child = children[0]
-        if not tree.item(first_child, "values"):
-            tree.delete(first_child)
-            insert_nodes(node, path)
 
 tree.bind("<<TreeviewOpen>>", on_open_node)
 tree.bind("<Double-1>", on_tree_double_click)
@@ -2356,17 +3625,40 @@ def replace_text():
         replace_win.destroy()
 
     def do_replace_next():
-        find_text_val = find_entry.get()
-        replace_text_val = replace_entry.get()
-        idx = text.search(find_text_val, text.index(tk.INSERT), tk.END)
-        if idx:
-            end_idx = f"{idx}+{len(find_text_val)}c"
-            text.delete(idx, end_idx)
-            text.insert(idx, replace_text_val)
-            text.tag_add('found', start_pos, end_pos)
+        find_text = find_entry.get()
+        replace_text = replace_entry.get()
+    
+        if not find_text:
+            return
+    
+        start_pos = text.index(tk.INSERT)
+    
+        found_pos = text.search(find_text, start_pos, 
+                              stopindex=tk.END, 
+                              nocase=0,
+                              regexp=False)
+    
+        if found_pos:
+            end_pos = f"{found_pos}+{len(find_text)}c"
+        
+            text.delete(found_pos, end_pos)
+            text.insert(found_pos, replace_text)
+        
+            new_end = f"{found_pos}+{len(replace_text)}c"
+            text.tag_remove('found', '1.0', tk.END)
+            text.tag_add('found', found_pos, new_end)
             text.tag_config('found', background='yellow', foreground='black')
-            text.mark_set(tk.INSERT, f"{idx}+{len(replace_text_val)}c")
-            highlight_full_document()
+
+            text.mark_set(tk.INSERT, new_end)
+            text.see(found_pos)
+        
+            root.after(50, highlight_document_in_chunks)
+        else:
+            if text.compare(start_pos, "!=", "1.0"):
+                text.mark_set(tk.INSERT, "1.0")
+                root.after(100, do_replace_next)
+            else:
+                text.bell()
 
     tk.Button(replace_win, text=translate.get("replace"), command=do_replace_next).grid(row=2, column=0, padx=5, pady=5)
     tk.Button(replace_win, text=translate.get("replace_all"), command=do_replace).grid(row=2, column=1, padx=5, pady=5)
@@ -2400,158 +3692,447 @@ def bind_tooltips():
             text.tag_bind(tag_name, "<Enter>", lambda e, sig=signature: tooltip_manager.show(e, sig))
             text.tag_bind(tag_name, "<Leave>", tooltip_manager.hide)
             
-def install_runner(lang):
-    if platform.system() == "Windows":
-        if lang == "javascript":
+def save_tempdir_mkhistory(tmpdir):
+    tempdirs_file = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "tempsave", ".tempdir_mkhistory")
+    os.makedirs(os.path.dirname(tempdirs_file), exist_ok=True)
+    if os.path.exists(tempdirs_file):
+        with open(tempdirs_file, "r", encoding="utf-8") as f:
+            all_dirs = set(line.strip() for line in f if line.strip())
+    else:
+        all_dirs = set()
+    if tmpdir not in all_dirs:
+        with open(tempdirs_file, "a", encoding="utf-8") as f:
             try:
-                subprocess.run(["node", "--version"], capture_output=True, check=True)
-                return True
-            except:
-                pass
-            try:
-                subprocess.run(["winget", "install", "-e", "--id", "OpenJS.NodeJS"], check=True, shell=True)
-                return True
-            except Exception:
+                if os.path.getsize(tempdirs_file) > 0:
+                    f.write(f"\n{tmpdir}")
+                else:
+                    f.write(tmpdir)
+            except Exception as e:
+                print(f"{translate.get('error_a4')}{e}")
+                return
+        
+def del_mkhistory_tempdirs(explicit_search=False):
+    tempdirs_file = os.path.join(os.getenv("USERPROFILE"), ".slashcode", "tempsave", ".tempdir_mkhistory")
+    if os.path.exists(tempdirs_file):
+        with open(tempdirs_file, "r", encoding="utf-8") as f:
+            dirs = [line.strip() for line in f if line.strip()]
+            print(translate.get("deleting_dirs") + ', '.join(dirs))
+            for _dir in dirs:
                 try:
-                    subprocess.run(["choco", "install", "nodejs", "-y"], check=True, shell=True)
-                    return True
+                    shutil.rmtree(_dir, ignore_errors=True)
                 except Exception:
-                    return False
-        elif lang == "cpp":
+                    continue
+        os.remove(tempdirs_file)
+        return True
+    else:
+        print(translate.get("directory_del_not_found"))
+    if explicit_search:
+        _temp_dir = os.path.join(os.getenv("LOCALAPPDATA"), "Temp") 
+        for root, dirs, files in os.walk(_temp_dir):
+            for dir_name in dirs[:]:
+                if dir_name.startswith("sc_") or dir_name.startswith("sc_mingw_"):
+                    full_path = os.path.join(root, dir_name)
+                    try:
+                        shutil.rmtree(full_path, ignore_errors=True)
+                    except Exception:
+                        pass
+        
+def install_runner(lang, return_temp_cppdir=False):
+    if platform.system() != "Windows":
+        # Planning to extend for other platform support later.
+        return False
+
+    def run_cmd(cmd):
+        try:
+            subprocess.run(cmd, capture_output=True, check=True, shell=False)
+            return True
+        except Exception:
+            return False
+
+    if lang == "javascript":
+        if run_cmd(["node", "--version"]):
+            return True
+        try:
+            subprocess.run(["winget", "install", "-e", "--id", "OpenJS.NodeJS"], check=True, shell=True)
+            return True
+        except Exception:
             try:
-                subprocess.run(["g++", "--version"], capture_output=True, check=True)
+                subprocess.run(["choco", "install", "nodejs", "-y"], check=True, shell=True)
                 return True
-            except:
-                pass
-            try:
-                subprocess.run(["winget", "install", "-e", "--id", "MSYS2.MSYS2"], check=True, shell=True)
-                print(translate.get("msys_install"))
-                return False
             except Exception:
                 return False
-        elif lang == "cs":
+
+    elif lang == "cpp":
+        try:
+            print(translate.get("gcc_check_a1"))
+            result = subprocess.run(["g++", "--version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                version_str = result.stdout.split()[2]
+                major_version = int(version_str.split('.')[0])
+                print(f"{translate.get("gcc_found_compiler_ver")} {version_str}")
+                if major_version >= 10:
+                    print(f"{translate.get("gcc_sufficient_compiler_ver")} ({version_str})")
+                    return True
+                else:
+                    print(f"{translate.get("gcc_old_compiler_ver")} ({version_str})")
+        except Exception as e:
+            print(f"{translate.get("gcc_error_a2")} {e}")
+
+        try:
+            print(translate.get("gcc_check_a2"))
+            temp_dir = tempfile.mkdtemp(prefix="sc_mingw_")
+            save_tempdir_mkhistory(temp_dir)
+            mingw_url = "https://github.com/niXman/mingw-builds-binaries/releases/download/12.2.0-rt_v10-rev2/x86_64-12.2.0-release-posix-seh-msvcrt-rt_v10-rev2.7z"
+            mingw_archive = os.path.join(temp_dir, "mingw.7z")
+            print(f"{translate.get("gcc_check_a3").replace("***", mingw_url)}")
+            with requests.get(mingw_url, stream=True) as r, open(mingw_archive, "wb") as f:
+                total_bytes = 0
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    total_bytes += len(chunk)
+                    print(f"{translate.get("gcc_check_a4").replace("***", f"{total_bytes / 1024 / 1024:.2f}")}", end='\r')
+                print(f"{translate.get("gcc_check_a4_5").replace("***", f"{total_bytes / 1024 / 1024:.2f}")}")
+
             try:
-                subprocess.run(["csc"], capture_output=True, check=True)
+                import py7zr # type: ignore (@UnresolvedImports)
+                print(f"{translate.get("gcc_check_b1")}")
+            except ImportError:
+                print(f"{translate.get("pyzr_error_a1")}")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "py7zr"])
+                import py7zr # type: ignore (@UnresolvedImports)
+                print(f"{translate.get("py7zr_installed")}")
+
+            with py7zr.SevenZipFile(mingw_archive, mode='r') as archive:
+                archive.extractall(path=temp_dir)
+            print(f"{translate.get("gcc_mingw_extracted")} {temp_dir}")
+
+            mingw_bin = os.path.join(temp_dir, "mingw64", "bin")
+            os.environ["PATH"] = mingw_bin + os.pathsep + os.environ.get("PATH", "")
+            print(f"{translate.get("gcc_mingw_addpath")} {mingw_bin}")
+
+            print(translate.get("msys_install") + f" | MinGW-w64: {mingw_bin}")
+            if return_temp_cppdir:
+                return temp_dir
+            else:
                 return True
-            except:
-                pass
+        except Exception as e:
+            print(f"{translate.get('msys_error_a1')} {e}")
+            return False
+
+    elif lang == "cs":
+        if run_cmd(["csc"]):
+            return True
+        try:
+            subprocess.run(["winget", "install", "-e", "--id", "Microsoft.DotNet.SDK.8"], check=True, shell=True)
+            return True
+        except Exception:
             try:
-                subprocess.run(["winget", "install", "-e", "--id", "Microsoft.DotNet.SDK.8"], check=True, shell=True)
+                subprocess.run(["choco", "install", "dotnetcore-sdk", "-y"], check=True, shell=True)
                 return True
             except Exception:
-                try:
-                    subprocess.run(["choco", "install", "dotnetcore-sdk", "-y"], check=True, shell=True)
-                    return True
-                except Exception:
-                    return False
+                return False
+
     return False
 
 def run_code():
     code = text.get("1.0", tk.END).strip()
     lang = language_var.get()
-    output_window = tk.Toplevel(root)
-    output_window.title("Output")
-    output_text = tk.Text(output_window, font=font)
+    theme = themes[current_theme]
+    output_window = tk.Toplevel(root, background=theme['bg'], bg=theme['bg'], highlightbackground=theme['bg'], highlightthickness=1)
+    output_window.title(translate.get("sc_output"))
+    if os.name == "nt":
+        try:
+            output_window.iconbitmap(icon_path)
+        except Exception:
+            pass
+    else:
+        try:
+            icon = tk.PhotoImage(file=os.path.abspath("slash.png"))
+            output_window.iconphoto(True, icon)
+        except Exception:
+            pass
+    output_text = tk.Text(output_window, font=font, bg=theme['bg'], fg=theme['fg'], insertbackground=theme['cursor'])
     output_text.pack(fill=tk.BOTH, expand=True)
 
     def show_error(message):
-        output_text.insert(tk.END, f"Error: {message}\n")
+        output_text.insert(tk.END, f"{translate.get('error_a1')}: {message}\n")
 
-    def check_runner(runner_name, check_cmd, install_instructions):
+    def check_runner(check_cmd, runner_name="", install_instructions=""):
         try:
             subprocess.run(check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return True
         except FileNotFoundError:
-            output_text.insert(tk.END, runner_name + translate.get("runner_not_found") + f" Please install it first.\n" + translate.get("instructions") + f"{install_instructions}\n")
+            output_text.insert(tk.END, runner_name + translate.get("runner_not_found") + translate.get("install_suggest") + translate.get("instructions") + f"{install_instructions}\n")
             return False
 
     try:
         if lang == "python":
             import io
             old_stdout = sys.stdout
-            sys.stdout = mystdout = io.StringIO()
+            sys.stdout = sepstdout = io.StringIO()
             try:
-                exec(code, {})
+                exec(code, {"__name__": "__main__", "__file__": current_file})
             except Exception as e:
                 print(e)
             sys.stdout = old_stdout
-            output = mystdout.getvalue()
+            output = sepstdout.getvalue()
 
         elif lang == "javascript":
-            if not check_runner("Node.js", ["node", "--version"], 
-                              "https://nodejs.org"):
+            if not check_runner(["node", "--version"], "Node.js", 
+                                "Node: https://nodejs.org"):
                 return
-            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, delete_on_close=False) as f:
                 f.write(code)
                 f.flush()
+                f.close()
                 result = subprocess.run(["node", f.name], capture_output=True, text=True)
             output = result.stdout + result.stderr
-
+    
         elif lang == "cpp":
-            if not check_runner("G++ compiler", ["g++", "--version"],
-                              "https://sourceforge.net/projects/mingw/"):
+            if not check_runner(["g++", "--version"], "G++ compiler", "G++: https://sourceforge.net/projects/mingw/"):
+                output_text.insert('1.0', "G++ " + translate.get("runner_not_found") +
+                                   translate.get("install_suggest") + translate.get("instructions") +
+                                   "G++: https://sourceforge.net/projects/mingw/\n")
+                print(translate.get("gcc_error_b1"))
                 return
-            with tempfile.NamedTemporaryFile("w", suffix=".cpp", delete=False) as f:
-                f.write(code)
-                f.flush()
-                exe_file = f.name + ".exe"
-                compile_result = subprocess.run(
-                    ["g++", f.name, "-o", exe_file],
-                    capture_output=True,
-                    text=True
-                )
-                if compile_result.returncode == 0:
-                    run_result = subprocess.run([exe_file], capture_output=True, text=True)
-                    output = run_result.stdout + run_result.stderr
-                else:
-                    output = "Compilation Error:\n" + compile_result.stderr
+            temp_dir = tempfile.mkdtemp(prefix='sc_')
+            cpp_path = os.path.join(temp_dir, "temp.cpp")
+            exe_path = os.path.join(temp_dir, f"{''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))}.exe")
+            if not os.path.exists(os.path.join(os.getenv("USERPROFILE"), ".slashcode")):
+                os.mkdir(os.path.join(os.getenv("USERPROFILE"), ".slashcode"))
+                os.mkdir(os.path.join(os.getenv("USERPROFILE"), ".slashcode", "tempsave"))
+            save_tempdir_mkhistory(temp_dir)
+
+            try:
+                with open(cpp_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                print(f"{translate.get('cpp_usercode_written').replace('***', cpp_path)}")
+                output = ""
+                mingw_dir = None
+                for std_flag in ["-std=c++17", "-std=c++14", "-std=c++11"]:
+                    try:
+                        if mingw_dir:
+                            mingw_bin = os.path.join(mingw_dir, "mingw64", "bin")
+                            env = os.environ.copy()
+                            env["PATH"] = mingw_bin + os.pathsep + env.get("PATH", "")
+                        else:
+                            env = os.environ.copy()
+                        cmd = ["g++", cpp_path, "-o", exe_path, std_flag,
+                               "-pthread", "-static-libgcc", "-static-libstdc++", "-Wl,--enable-stdcall-fixup"]
+                        print(f"{translate.get('gcc_compilation_attempt').replace('***', std_flag)} {' '.join(cmd)}")
+                        compile_result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+                        version_result = subprocess.run(["g++", "--version"], capture_output=True, text=True, env=env)
+                        print(f"{translate.get('gcc_used')} {version_result.stdout.splitlines()[0] if version_result.stdout else '(?)'}")
+                        output_text.insert(tk.END, f"GCC: {version_result.stdout.splitlines()[0] if version_result.stdout else '(?)'}\n")
+                        if compile_result.returncode == 0:
+                            print(f"{translate.get('gcc_compilation_success')} ({exe_path})")
+                            try:
+                                run_result = subprocess.run([exe_path], text=True, creationflags=subprocess.CREATE_NEW_CONSOLE, env=env)
+                                output_text.insert(tk.END, run_result.stdout + run_result.stderr + "\n")
+                                print(f"{translate.get('gcc_execution_finished')}")
+                                return
+                            except Exception as e:
+                                print(translate.get('gcc_execution_error_a1'), e)
+                                output += f"{translate.get('error_d1')}{e}"
+                                return
+                        else:
+                            print(f"{translate.get('gcc_compilation_failed').replace('***', std_flag)}")
+                            print(compile_result.stderr)
+                            output += f"{translate.get('compilation_error')}\n" + compile_result.stderr
+                            try:
+                                print(translate.get('gcc_check_b2'))
+                                mingw_dir_new = install_runner("cpp", return_temp_cppdir=True)
+                                if not mingw_dir_new:
+                                    output += translate.get('gcc_error_b2')
+                                else:
+                                    mingw_dir = mingw_dir_new
+                                    print(translate.get('gcc_compiler_installed'))
+                            except Exception:
+                                print(translate.get("gcc_error_a1"))
+                    except Exception as e:
+                        print(translate.get('error_d2') + f"\n\n{e}")
+            except Exception as e:
+                print(f"{translate.get('error_d1_5')}{e}")
 
         elif lang == "cs":
-            if not check_runner("C# Compiler (csc)", ["csc"],
-                              "Install .NET SDK: https://dotnet.microsoft.com"):
+            if not check_runner(["csc"], translate.get('csc_compiler'), ".NET SDK: https://dotnet.microsoft.com"):
+                output_text.insert(tk.END, translate.get('csc_error_a1'))
+                if not install_runner("cs"):
+                    output_text.insert(tk.END, translate.get('csc_autoinst_fail'))
+                    print(translate.get('csc_error_a2'))
                 return
-            with tempfile.NamedTemporaryFile("w", suffix=".cs", delete=False) as f:
-                f.write(code)
-                f.flush()
-                exe_file = f.name.replace(".cs", ".exe")
-                compile_result = subprocess.run(
-                    ["csc", f.name],
-                    capture_output=True,
-                    text=True
-                )
+            else:
+                output += translate.get('csc_compiler_installed')
+
+            temp_dir = tempfile.mkdtemp(prefix='sc_')
+            cs_path = os.path.join(temp_dir, "temp.cs")
+            exe_path = os.path.join(temp_dir, f"{''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=5))}.exe")
+
+            try:
+                with open(cs_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                print(f"{translate.get('cs_usercode_written').replace('***', cs_path)}")
+                output += f"{translate.get('cs_usercode_written').replace('***', cs_path)}"
+                env = os.environ.copy()
+
+                compile_cmd = ["csc", cs_path, f"/out:{exe_path}"]
+                output_text.insert(tk.END, f"{translate.get('csc_compiling_with')} {' '.join(compile_cmd)}\n")
+
+                compile_result = subprocess.run(compile_cmd, capture_output=True, text=True, env=env)
+
                 if compile_result.returncode == 0:
-                    run_result = subprocess.run([exe_file], capture_output=True, text=True)
-                    output = run_result.stdout + run_result.stderr
+                    output_text.insert(tk.END, translate.get('csc_compilation_success'))
+                    try:
+                        run_result = subprocess.run([exe_path], text=True, creationflags=subprocess.CREATE_NEW_CONSOLE, env=env)
+                        output += run_result.stdout + run_result.stderr + "\n"
+                        print(translate.get('csc_execution_finished'))
+                    except Exception as e:
+                        error_msg = f"{translate.get('error_d1')}{e}"
+                        print(translate.get('csc_execution_error_a1'), e)
+                        output += error_msg
                 else:
-                    output = translate.get("compilation_error") + compile_result.stderr
+                    error_msg = f"{translate.get('compilation_error')}\n" + compile_result.stderr
+                    print(f"{translate.get('compilation_error')}\n", compile_result.stderr)
+                    output += error_msg
+
+            except Exception as e:
+                error_msg = f"{translate.get('error_d1_5')}{e}"
+                output_text.insert(tk.END, error_msg)
+                print(error_msg)
 
         elif lang == "html":
             import webbrowser
-            with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+            with tempfile.NamedTemporaryFile("w", prefix="sc_", suffix=".html", delete=False, delete_on_close=False) as f:
                 f.write(code)
                 f.flush()
+                f.close()
                 file_url = "file://" + os.path.abspath(f.name)
                 webbrowser.open_new_tab(file_url)
             output = translate.get("opened_in_browser")
 
+        elif lang == "shell":
+            output = ''
+            if platform.system() in ("Linux", "Darwin"):
+                try:
+                    if current_file and os.path.isfile(current_file):
+                        ext = Path(current_file).suffix.lower()
+                        if ext in (".sh", ".bash", ".zsh"):
+                            result = subprocess.run(["bash", current_file], capture_output=True, text=True)
+                        else:
+                            with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_script:
+                                temp_script.write(text.get(1.0, tk.END))
+                                os.chmod(temp_script.name, 0o700)
+                                result = subprocess.run(["bash", temp_script.name], capture_output=True, text=True)
+                                os.unlink(temp_script.name)
+                    else:
+                        with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as temp_script:
+                            temp_script.write(text.get(1.0, tk.END))
+                            os.chmod(temp_script.name, 0o700)
+                            result = subprocess.run(["bash", temp_script.name], capture_output=True, text=True)
+                            os.unlink(temp_script.name)
+
+                    if result.returncode != 0:
+                        show_error(result.stderr)
+                    else:
+                        output += result.stdout
+
+                except Exception as e:
+                   show_error(str(e))
+            else:
+                msg = f"{translate.get('sh_platform_not_supported')} ({platform.system().replace('Darwin', 'MacOS')})"
+                show_error(msg)
+                
         else:
             output = translate.get("language_not_supported")
 
     except subprocess.CalledProcessError as e:
-        output = translate.get("process_error") + f" ({e.returncode}):\n{e.stderr}"
+        output = translate.get("process_error") + f"({e.returncode}):\n{e.stderr}"
     except Exception as e:
-        output = translate.get("unexpected_error") + f"{str(e)}"
-    finally:
+        output = translate.get("unexpected_error") + str(e)
+    finally: # Cleanup
         if 'f' in locals() and hasattr(f, 'name'):
             try:
-                os.unlink(f.name)
+                if lang in ("python", "html"):
+                    if lang == "python":
+                        del sepstdout
+                f.close()
+                del f
                 if lang in ("cpp", "cs"):
-                    os.unlink(exe_file)
+                    os.unlink(exe_path)
+                    shutil.rmtree(temp_dir)
             except Exception as e:
-                show_error(translate.get("cleanup_failed") + f"{str(e)}")
+                show_error(translate.get("cleanup_failed") + str(e))
 
+    output_text.config(state='normal')
     output_text.insert("1.0", output)
     output_text.see(tk.END)
+    output_text.config(state='disabled')
+    
+    def save_output():
+        downloads_path = os.path.join(os.getenv("USERPROFILE"), "Downloads")
+        sc_output_path = os.path.join(downloads_path, translate.get("sc_output"))
+        if os.path.exists(sc_output_path):
+            shutil.rmtree(sc_output_path)
+        os.mkdir(sc_output_path)
+        with open(os.path.join(sc_output_path, f"{translate.get('sc_output').lower().replace('-', '_')}.txt"), "w", encoding="utf-8") as f:
+            f.write(fr'''{translate.get("output_sc_title")}
+____________________________________________________________________________________
+{output_text.get("1.0", tk.END)}''')   
+    del output
+    button_frame = tk.Frame(output_window, bg=theme['bg'])
+    button_frame.pack(fill=tk.X, pady=10)
+    sot = tk.Button(output_window, text=translate.get("save_output_text"), command=save_output)
+    _exit = tk.Button(output_window, text=translate.get("exit"), command=lambda: root.after(50, output_window.destroy()))
+    sot.pack(side=tk.LEFT, fill=tk.X, expand=True) ; _exit.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+    
+def reboot_with_console(event=None):
+    version_cmds = [["py", "--version"], ["python", "--version"], [fr"{sys.executable}", "--version"]]
+    version_output = None
+
+    for cmd in version_cmds:
+        try:
+            version_result = subprocess.run(cmd, text=True, capture_output=True)
+            if version_result.returncode == 0:
+                version_output = version_result.stdout.strip()
+                break
+        except Exception:
+            continue
+
+    if version_output is None:
+        messagebox.showerror(translate.get("process_error").strip()[:-1], translate.get("py_error_a2"))
+        return
+    try:
+        version_number = version_output.split()[1]
+        major_minor = tuple(map(int, version_number.split('.')[:2]))
+    except Exception:
+        messagebox.showerror(translate.get("process_error").strip()[:-1], translate.get("py_error_a3"))
+        return
+
+    if major_minor in [(3, 13), (3, 14)]:
+        userprofile_path = os.path.join(os.getenv("USERPROFILE"), "Downloads", "SlashCode", "SlashCode.py")
+        if os.path.exists(userprofile_path):
+            script_path = userprofile_path
+        else:
+            script_path = os.path.abspath("SlashCode.py")
+
+        try:
+            if platform.system() == "Windows":
+                subprocess.Popen([sys.executable, script_path], creationflags=subprocess.CREATE_NEW_CONSOLE, env=tcltk_env)
+            elif platform.system() == "Linux":
+                if shutil.which('gnome-terminal'):
+                    subprocess.Popen(['gnome-terminal', '--', 'bash', '-c', f'python3 "{script_path}"; exec bash'], env=tcltk_env)
+                elif shutil.which('xterm'):
+                    subprocess.Popen(['xterm', '--', 'bash', '-c', f'python3 "{script_path}"; exec bash'], env=tcltk_env)
+                elif shutil.which("konsole"):
+                    subprocess.Popen(['konsole', '-e', f'bash -c "python3 \\"{script_path}\\"; exec bash"'], env=tcltk_env)
+            elif platform.system() == "Darwin":
+                subprocess.Popen(['osascript', '-e', f'tell application "Terminal" to do script "python3 \\"{script_path}"\\"; exec bash"'], env=tcltk_env)
+            root.destroy()
+        except Exception as e:
+            messagebox.showerror(translate.get("process_error").strip()[:-1], f"{translate.get('error_a5')}{e}")
+            return
+    else:
+        messagebox.showerror(translate.get("py_error_a1_title"), translate.get("py_error_a1"))
 
 sidebar_visible = [True]  
 def show_sidebar():
@@ -2563,16 +4144,89 @@ def hide_sidebar():
     sidebar_visible[0] = False
 
 def update_line_numbers(event=None):
+    if hasattr(update_line_numbers, 'after_id'):
+        root.after_cancel(update_line_numbers.after_id)
+    update_line_numbers.after_id = root.after(50, _actually_update_line_numbers)
+
+def _actually_update_line_numbers():
     line_numbers.config(state='normal')
     line_numbers.delete('1.0', tk.END)
     row_count = int(text.index('end-1c').split('.')[0])
-    row_count = max(1, row_count)
-    line_numbers.insert('1.0', '\n'.join(str(i) for i in range(1, row_count + 1)))
+    lines = "\n".join(str(i) for i in range(1, row_count + 1))
+    line_numbers.insert('1.0', lines)
     line_numbers.config(width=len(str(row_count)) + 1)
     line_numbers.config(state='disabled')
-    if event is not None:
-        text.edit_modified(False)
+
+
+theme = themes[current_theme]
+cpu_usage_frame = tk.Frame(sidebar, bg=theme['bg'])
+cpu_usage_text = tk.Label(cpu_usage_frame, font=font, text="CPU: --%", bg=theme['bg'], fg=theme['fg'])
+cpu_usage_text.pack()
+ram_usage_frame = tk.Frame(sidebar, bg=theme['bg'])
+ram_usage_text = tk.Label(ram_usage_frame, font=font, text="RAM: --% / --GB", bg=theme['bg'], fg=theme['fg'])
+ram_usage_text.pack()
+file_length_frame = tk.Frame(sidebar, bg=theme['bg'])   
+file_length_text = tk.Label(file_length_frame, font=font, text="File Length: -- Character(s) | -- Word(s) | -- Line(s)", bg=theme['bg'], fg=theme['fg'], wraplength=200, justify=tk.LEFT)
+file_length_text.pack()
+process = psutil.Process(os.getpid())
+app_cpu_usage_frame = tk.Frame(sidebar, bg=theme['bg'])
+app_cpu_usage_text = tk.Label(app_cpu_usage_frame, font=font, text="App CPU: --%", bg=theme['bg'], fg=theme['fg'])
+app_cpu_usage_text.pack()
+app_ram_usage_frame = tk.Frame(sidebar, bg=theme['bg'])
+app_ram_usage_text = tk.Label(app_ram_usage_frame, font=font, text="App RAM: --% / --GB", bg=theme['bg'], fg=theme['fg'])
+app_ram_usage_text.pack()
+
+psutil.cpu_percent(interval=0.5)
+
+debug_visible = False
+pending_update = None
+
+def show_debug_info(event=None):
+    global debug_visible, pending_update
     
+    if not debug_visible:
+        cpu_usage_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+        ram_usage_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+        file_length_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+        app_cpu_usage_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+        app_ram_usage_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
+        debug_visible = True
+    
+    cpu = psutil.cpu_percent()
+    cpu_usage_text.config(text=f'CPU: {cpu:.1f}%')
+    
+    ram = psutil.virtual_memory()
+    ram_usage_text.config(text=f'RAM: {ram.percent}% / {ram.used/(1024**3):.1f}GB')
+    
+    file_length = len(text.get("1.0", tk.END))
+    word_count = len(text.get("1.0", tk.END).split())
+    line_count = int(text.index('end-1c').split('.')[0])
+    file_length_text.config(text=f'File Length: {file_length} Character(s) | {word_count} Word(s) | {line_count} Line(s)')
+    
+    app_cpu = process.cpu_percent(interval=0.1)
+    app_ram = process.memory_info()
+    total_ram = psutil.virtual_memory().total
+    app_used_ram = (app_ram.rss / total_ram) * 100 
+    app_cpu_usage_text.config(text=f'App CPU: {app_cpu:.1f}%')
+    app_ram_usage_text.config(text=f'App RAM: {app_used_ram:.2f}% / {app_ram.rss/(1024**3):.2f}GB')
+    
+    if debug_visible:
+        pending_update = root.after(2000, show_debug_info)
+
+def hide_debug_info(event=None):
+    global debug_visible, pending_update
+    
+    if pending_update:
+        root.after_cancel(pending_update)
+        pending_update = None
+    
+    cpu_usage_frame.pack_forget()
+    ram_usage_frame.pack_forget()
+    file_length_frame.pack_forget()
+    app_cpu_usage_frame.pack_forget()
+    app_ram_usage_frame.pack_forget()
+    debug_visible = False
+
 highlight_job = None
 debounce_delay = 300
 def on_key_release(event=None):
@@ -2591,11 +4245,10 @@ def clean_temp_files():
     if os.path.exists(temp_dir):
         for filename in os.listdir(temp_dir):
             file_path = os.path.join(temp_dir, filename)
-            print(file_path)
             try:
                 if os.path.isfile(file_path):
                     os.remove(file_path)
-            except Exception as e:
+            except Exception:
                 pass
             
 is_fullscreen = False
@@ -2616,9 +4269,13 @@ text.bind('<ButtonRelease-1>', on_button_release)
 text.bind('<Configure>', on_configure)
 text.bind("<<Paste>>", on_paste)
 text.bind('<Return>', auto_indent)
-text.bind('<BackSpace>', lambda e: (update_line_numbers(), None))
+text.bind('<BackSpace>', update_line_numbers)
+text.bind('<Button-4>', update_line_numbers)
+text.bind('<Button-5>', update_line_numbers)
 text.bind("<Control-o>", open_file)
 text.bind("<Control-s>", save_file)
+text.bind("<Control-d>", show_debug_info)
+text.bind("<Control-k>", hide_debug_info)
 text.bind("<Control-D>", open_folder)
 text.bind("<Control-z>", undo_action)
 text.bind("<Control-y>", redo_action)
@@ -2629,6 +4286,9 @@ text.bind("<Control-f>", find_text)
 text.bind("<Control-h>", replace_text)
 text.bind("<Control-n>", new_file)
 text.bind("<Control-t>", clean_temp_files)
+text.bind("<Control-T>", del_mkhistory_tempdirs)
+text.bind("<Control-Alt-e>", reboot_with_console)
+text.bind("<Control-W>", lambda: del_mkhistory_tempdirs(True))
 text.bind("<F11>", toggle_fullscreen)
 root.bind("<Escape>", exit_fullscreen)
 root.bind("<Control-minus>", zoom_out)
@@ -2661,6 +4321,10 @@ def set_ui():
     file_menu.add_separator()
     file_menu.add_checkbutton(label=translate.get("toggle_new_file_saving"), variable=save_new_file, onvalue=True, offvalue=False)
     file_menu.add_command(label=translate.get("clean_temp_files"), command=clean_temp_files, accelerator="Ctrl+T")
+    file_menu.add_command(label=translate.get("clean_temp_directories"), command=del_mkhistory_tempdirs, accelerator="Ctrl+Shift+T")
+    file_menu.add_command(label=translate.get("fully_wipe_directories"), command=lambda: del_mkhistory_tempdirs(True), accelerator="Ctrl+Shift+W")
+    file_menu.add_separator()
+    file_menu.add_command(label=translate.get("reboot_consolemode"), command=reboot_with_console, accelerator="Ctrl+Alt+E")
     file_menu.add_separator()
     file_menu.add_command(label=translate.get("exit"), command=root.quit)
 
@@ -2692,8 +4356,11 @@ def set_ui():
     view_menu.add_command(label=translate.get("show_minimap"), command=show_minimap, accelerator="Ctrl+Shift+H")
     view_menu.add_command(label=translate.get("hide_minimap"), command=hide_minimap, accelerator="Ctrl+K")
     view_menu.add_separator()
-    view_menu.add_command(label=translate.get("toggle_fullscreen"), command=toggle_fullscreen)
-    view_menu.add_command(label=translate.get("exit_fullscreen"), command=exit_fullscreen)
+    view_menu.add_command(label=translate.get("show_debug_info"), command=show_debug_info, accelerator="Ctrl+D")
+    view_menu.add_command(label=translate.get("hide_debug_info"), command=hide_debug_info, accelerator="Ctrl+K")
+    view_menu.add_separator()
+    view_menu.add_command(label=translate.get("toggle_fullscreen"), command=toggle_fullscreen, accelerator="F11")
+    view_menu.add_command(label=translate.get("exit_fullscreen"), command=exit_fullscreen, accelerator="Esc")
 
     menu.add_cascade(label=translate.get("run"), menu=run_menu)
     run_index = menu.index(tk.END)
@@ -2710,15 +4377,21 @@ def set_ui():
     language_menu.add_radiobutton(label=translate.get("cs"), variable=language_var, value='cs', command=highlight_language_change)
     language_menu.add_radiobutton(label=translate.get("markdown"), variable=language_var, value='markdown', command=highlight_language_change)
     language_menu.add_radiobutton(label=translate.get("renpy"), variable=language_var, value='renpy', command=highlight_language_change)
+    language_menu.add_radiobutton(label=translate.get("shell"), variable=language_var, value='shell', command=highlight_language_change)
 
 
     menu.add_cascade(label=translate.get("gui_lang"), menu=guilang_menu)
     guilang_index = menu.index(tk.END)
-    guilang_menu.add_radiobutton(label="English", variable=lang_var, value="en", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="Nederlands", variable=lang_var, value="nl", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="Español", variable=lang_var, value="es", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="Français", variable=lang_var, value="fr", command=on_lang_change)
-    guilang_menu.add_radiobutton(label="日本語", variable=lang_var, value="jp", command=on_lang_change)
+    guilang_menu.add_radiobutton(label="English", variable=lang_var, value="en", image=language_icons['en'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Nederlands", variable=lang_var, value="nl", image=language_icons['nl'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Deutsch", variable=lang_var, value="de", image=language_icons['de'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Español", variable=lang_var, value="es", image=language_icons['es'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Italiano", variable=lang_var, value="it", image=language_icons['it'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="Français", variable=lang_var, value="fr", image=language_icons['fr'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="日本語", variable=lang_var, value="jp", image=language_icons['jp'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="中文", variable=lang_var, value="zh", image=language_icons['zh'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="한국인", variable=lang_var, value="ko", image=language_icons['ko'], compound=tk.LEFT, command=on_lang_change)
+    guilang_menu.add_radiobutton(label="عربي", variable=lang_var, value="ar", image=language_icons['ar'], compound=tk.LEFT, command=on_lang_change)
 
 def save_session():
     config_dir = os.path.expanduser('~/.slashcode')
@@ -2774,6 +4447,18 @@ def on_close():
 
 root.protocol("WM_DELETE_WINDOW", on_close)
 
+def handle_command_line_args():
+    global current_file, session
+    
+    if len(sys.argv) > 1:
+        file_to_open = os.path.abspath(sys.argv[1])
+        if os.path.isfile(file_to_open):
+            current_file = file_to_open
+            session['file'] = file_to_open
+            load_file(file_to_open)
+            return True
+    return False
+
 def load_session():
     config_dir = os.path.expanduser('~/.slashcode')
     config_file = os.path.join(config_dir, 'session.json')
@@ -2787,17 +4472,13 @@ def load_session():
 
 session = load_session()
 try:
-    print(f"Loaded session: {session}\n\nFile: {session['file']}")
+    print(f"{translate.get("session_loaded")}\n{session.replace('{{', '{{\n    ').replace(',', ',\n    ')}\n\n{translate.get("file")}{':' if lang_var.get() != "jp" else "："} {session['file']}")
 except:
     pass
-if session.get('file'):
+if not handle_command_line_args() and session.get('file'):
     try:
-        if len(sys.argv) > 1:
-            current_file = os.path.abspath(sys.argv[1])
-            load_file(current_file)
-        else:
-            current_file = session['file']
-            load_file(current_file)
+        current_file = session['file']
+        load_file(current_file)
     except Exception as e:
         print(translate.get("error_b1") + f"{e}")
         
@@ -2811,21 +4492,16 @@ if session.get('theme'):
     set_theme(session['theme'])
 else:
     set_theme('light')
-if session.get('language'):
-    language_var.set(session['language'])
 if session.get('guilang'):
     lang_var.set(session['guilang'])
     on_lang_change()
+if session.get('language'):
+    language_var.set(session['language'])
 if session.get('save_new_file'):
     save_new_file.set(save_new_file.get())
-
-if len(sys.argv) > 1:
-    file_to_open = os.path.abspath(sys.argv[1])
-    if os.path.isfile(file_to_open):
-        current_file = file_to_open
-        load_file(file_to_open)
             
 root.after(100, update_minimap)
 update_line_numbers()
-            
+
+
 root.mainloop()
